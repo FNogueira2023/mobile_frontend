@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../src/theme/colors';
+import { colors } from './theme/colors';
 
 export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState([]);

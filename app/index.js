@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../src/theme/colors';
+import { colors } from './theme/colors';
 
 export default function HomeScreen() {
   // Temporary sample data - replace with actual API call later
