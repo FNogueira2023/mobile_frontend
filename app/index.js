@@ -32,6 +32,12 @@ export default function HomeScreen() {
         <Text style={styles.welcomeText}>Welcome to</Text>
         <Text style={styles.appTitle}>Recipe App</Text>
         <Text style={styles.subtitle}>Discover delicious recipes</Text>
+        <TouchableOpacity 
+          style={styles.registerButton}
+          onPress={() => router.push('/register/step1')}
+        >
+          <Text style={styles.registerButtonText}>Create Account</Text>
+        </TouchableOpacity>
       </View>
       
       <FlatList
@@ -48,17 +54,17 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cream,
+    backgroundColor: colors.background,
   },
   header: {
     padding: 20,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.mutedOlive,
+    borderBottomColor: colors.inputBackground,
   },
   welcomeText: {
     fontSize: 16,
-    color: colors.teal,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   appTitle: {
@@ -69,7 +75,20 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: colors.navyBlue,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  registerButton: {
+    backgroundColor: colors.primary,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  registerButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   listContainer: {
     padding: 16,
@@ -84,8 +103,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.mustard,
   },
   recipeContent: {
     flex: 1,
@@ -94,7 +111,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: colors.navyBlue,
+    color: colors.text,
   },
   recipeDetails: {
     flexDirection: 'row',
@@ -102,10 +119,10 @@ const styles = StyleSheet.create({
   },
   recipeTime: {
     fontSize: 14,
-    color: colors.teal,
+    color: colors.textSecondary,
   },
   recipeDifficulty: {
     fontSize: 14,
-    color: colors.mustard,
+    color: colors.textSecondary,
   },
 }); 

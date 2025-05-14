@@ -11,7 +11,7 @@ export default function RootLayout() {
         headerStyle: {
           backgroundColor: colors.primary,
         },
-        headerTintColor: colors.secondary,
+        headerTintColor: colors.white,
         headerTitleStyle: {
           fontWeight: 'bold',
         },
@@ -33,6 +33,19 @@ export default function RootLayout() {
         name="favorites"
         options={{
           title: 'My Favorites',
+        }}
+      />
+      <Stack.Screen
+        name="register/step1"
+        options={{
+          title: 'Create Account',
+          headerBackVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="register/step2"
+        options={{
+          title: 'Complete Profile',
         }}
       />
     </Stack>
