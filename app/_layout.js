@@ -36,6 +36,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="auth/login"
+        options={{
+          title: 'Sign In',
+          headerBackVisible: false,
+        }}
+      />
+      <Stack.Screen
         name="register/step1"
         options={{
           title: 'Create Account',
