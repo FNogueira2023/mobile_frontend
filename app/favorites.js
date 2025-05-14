@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../theme/colors';
+import { colors } from '../src/theme/colors';
 
-const FavoritesScreen = ({ navigation }) => {
+export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState([]);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ const FavoritesScreen = ({ navigation }) => {
   const renderFavoriteItem = ({ item }) => (
     <TouchableOpacity
       style={styles.favoriteItem}
-      onPress={() => navigation.navigate('Recipe', { recipeId: item })}
+      onPress={() => router.push(`/recipe?id=${item}`)}
     >
       <Text style={styles.favoriteTitle}>Recipe #{item}</Text>
     </TouchableOpacity>
@@ -52,7 +53,7 @@ const FavoritesScreen = ({ navigation }) => {
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -97,6 +98,4 @@ const styles = StyleSheet.create({
     color: colors.teal,
     textAlign: 'center',
   },
-});
-
-export default FavoritesScreen; 
+}); 

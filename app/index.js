@@ -1,8 +1,9 @@
+import { router } from 'expo-router';
 import React from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../theme/colors';
+import { colors } from '../src/theme/colors';
 
-const HomeScreen = ({ navigation }) => {
+export default function HomeScreen() {
   // Temporary sample data - replace with actual API call later
   const recipes = [
     { id: '1', title: 'Spaghetti Carbonara', time: '30 mins', difficulty: 'Medium' },
@@ -13,7 +14,7 @@ const HomeScreen = ({ navigation }) => {
   const renderRecipeItem = ({ item }) => (
     <TouchableOpacity
       style={styles.recipeItem}
-      onPress={() => navigation.navigate('Recipe', { recipeId: item.id })}
+      onPress={() => router.push(`/recipe?id=${item.id}`)}
     >
       <View style={styles.recipeContent}>
         <Text style={styles.recipeTitle}>{item.title}</Text>
@@ -42,7 +43,7 @@ const HomeScreen = ({ navigation }) => {
       />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -107,6 +108,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.mustard,
   },
-});
-
-export default HomeScreen; 
+}); 
