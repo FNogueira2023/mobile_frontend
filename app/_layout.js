@@ -67,6 +67,12 @@ export default function RootLayout() {
           title: 'Verify Code',
         }}
       />
+      <Stack.Screen
+        name="auth/upgrade-to-student"
+        options={{
+          title: 'Upgrade Account',
+        }}
+      />
     </Stack>
   );
 } 
