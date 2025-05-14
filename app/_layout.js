@@ -48,6 +48,18 @@ export default function RootLayout() {
           title: 'Complete Profile',
         }}
       />
+      <Stack.Screen
+        name="auth/forgot-password"
+        options={{
+          title: 'Reset Password',
+        }}
+      />
+      <Stack.Screen
+        name="auth/verify-code"
+        options={{
+          title: 'Verify Code',
+        }}
+      />
     </Stack>
   );
 } 
