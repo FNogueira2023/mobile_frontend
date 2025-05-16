@@ -1,0 +1,1 @@
+export const HOST_URL = "http://localhost:3000"; // Cambia esto por tu host real

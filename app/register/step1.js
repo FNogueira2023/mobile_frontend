@@ -2,15 +2,16 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
+import { HOST_URL } from '../config/config'; 
 
 export default function Step1() {
   const [email, setEmail] = useState('');
-  const [alias, setAlias] = useState('');
+  const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [aliasError, setAliasError] = useState('');
+  const [nicknameError, setNicknameError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
-  const [isCheckingAlias, setIsCheckingAlias] = useState(false);
+  const [isCheckingNickname, setIsCheckingNickname] = useState(false);
 
   // Debounce function to limit API calls
   const debounce = (func, wait) => {
@@ -26,7 +27,7 @@ export default function Step1() {
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        setEmailError('Please enter a valid email address');
+        setEmailError('Ingrese una dirección de correo electrónico válida');
       } else {
         setEmailError('');
       }
@@ -35,77 +36,77 @@ export default function Step1() {
     }
   }, [email]);
 
-  // Real-time alias validation and suggestions
-  const checkAlias = async (value) => {
+  // Real-time nickname validation and suggestions
+  const checkNickname = async (value) => {
     if (!value) {
-      setAliasError('');
+      setNicknameError('');
       setSuggestions([]);
       return;
     }
 
     if (value.length < 3) {
-      setAliasError('Alias must be at least 3 characters');
+      setNicknameError('El nickname debe tener al menos 3 caracteres');
       setSuggestions([]);
       return;
     }
 
     if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-      setAliasError('Alias can only contain letters, numbers, and underscores');
+      setNicknameError('El nickname solo puede contener letras, números y guiones bajos');
       setSuggestions([]);
       return;
     }
 
-    setIsCheckingAlias(true);
+    setIsCheckingNickname(true);
     try {
-      const response = await fetch('http://your-backend-url/api/check-alias', {
+      const response = await fetch(`${HOST_URL}/api/users/check-nickname`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ alias: value }),
+        body: JSON.stringify({ nickname: value }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         if (data.available) {
-          setAliasError('');
+          setNicknameError('');
           setSuggestions([]);
         } else {
-          setAliasError('This alias is already taken');
+          setNicknameError('El nickname ya está en uso');
           setSuggestions(data.suggestions || []);
         }
       } else {
-        setAliasError('Error checking alias availability');
+        setNicknameError('Error al verificar el nickname');
       }
     } catch (error) {
-      setAliasError('Network error. Please try again.');
+      setNicknameError('Error de conexión.');
     } finally {
-      setIsCheckingAlias(false);
+      setIsCheckingNickname(false);
     }
   };
 
-  // Debounced alias check
-  const debouncedCheckAlias = debounce(checkAlias, 500);
+  // Debounced nickname check
+  const debouncedCheckNickname = debounce(checkNickname, 500);
 
   useEffect(() => {
-    debouncedCheckAlias(alias);
-  }, [alias]);
+    debouncedCheckNickname(nickname);
+  }, [nickname]);
 
   const handleNext = async () => {
-    if (emailError || aliasError || !email || !alias) {
-      Alert.alert('Error', 'Please fix the errors before continuing');
+    if (emailError || nicknameError || !email || !nickname) {
+      Alert.alert('Error', 'Por favor, complete todos los campos correctamente');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/validate-registration', {
+      const response = await fetch(`${HOST_URL}/users/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, alias }),
+        body: JSON.stringify({ email, nickname }),
       });
 
       const data = await response.json();
@@ -113,33 +114,33 @@ export default function Step1() {
       if (response.ok) {
         router.push({
           pathname: '/register/step2',
-          params: { email, alias }
+          params: { email, nickname }
         });
       } else {
-        Alert.alert('Error', data.message || 'Something went wrong');
+        Alert.alert('Error', data.message || 'Algo salió mal');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión. Por favor, inténtelo de nuevo.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSuggestionPress = (suggestion) => {
-    setAlias(suggestion);
+    setNickname(suggestion);
   };
 
-  const isFormValid = !emailError && !aliasError && email && alias;
+  const isFormValid = !emailError && !nicknameError && email && nickname;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Step 1: Enter your email and choose an alias</Text>
+      <Text style={styles.title}>Crear Cuenta</Text>
+      <Text style={styles.subtitle}>Paso 1: Ingrese una dirección	de correo y elija un nickname</Text>
 
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, emailError && styles.inputError]}
-          placeholder="Email"
+          placeholder="Correo electrónico"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -149,23 +150,23 @@ export default function Step1() {
       </View>
 
       <View style={styles.inputContainer}>
-        <View style={styles.aliasContainer}>
+        <View style={styles.nicknameContainer}>
           <TextInput
-            style={[styles.input, aliasError && styles.inputError]}
-            placeholder="Alias"
-            value={alias}
-            onChangeText={setAlias}
+            style={[styles.input, nicknameError && styles.inputError]}
+            placeholder="Nickname"
+            value={nickname}
+            onChangeText={setNickname}
             autoCapitalize="none"
           />
-          {isCheckingAlias && (
+          {isCheckingNickname && (
             <ActivityIndicator style={styles.loader} color={colors.primary} />
           )}
         </View>
-        {aliasError ? <Text style={styles.errorText}>{aliasError}</Text> : null}
+        {nicknameError ? <Text style={styles.errorText}>{nicknameError}</Text> : null}
         
         {suggestions.length > 0 && (
           <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>Available aliases:</Text>
+            <Text style={styles.suggestionsTitle}>Available nicknames:</Text>
             {suggestions.map((suggestion, index) => (
               <TouchableOpacity
                 key={index}
@@ -185,7 +186,7 @@ export default function Step1() {
         disabled={!isFormValid || loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Validating...' : 'Next'}
+          {loading ? 'Validating...' : 'Siguiente'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -227,7 +228,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
   },
-  aliasContainer: {
+  nicknameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },

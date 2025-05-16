@@ -4,7 +4,7 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from
 import { colors } from '../theme/colors';
 
 export default function Step2() {
-  const { email, alias } = useLocalSearchParams();
+  const { email, nickname } = useLocalSearchParams();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +45,7 @@ export default function Step2() {
         },
         body: JSON.stringify({
           email,
-          alias,
+          nickname,
           firstName,
           lastName,
           password,
