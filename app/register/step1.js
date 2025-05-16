@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
-import { HOST_URL } from '../config/config'; 
 
 export default function Step1() {
   const [email, setEmail] = useState('');
@@ -36,7 +36,7 @@ export default function Step1() {
     }
   }, [email]);
 
-  // Real-time nickname validation and suggestions
+  // Nickname validation and suggestions
   const checkNickname = async (value) => {
     if (!value) {
       setNicknameError('');
@@ -80,17 +80,25 @@ export default function Step1() {
         setNicknameError('Error al verificar el nickname');
       }
     } catch (error) {
+      console.error('Error checking nickname:', error);
       setNicknameError('Error de conexión.');
     } finally {
       setIsCheckingNickname(false);
     }
   };
 
-  // Debounced nickname check
-  const debouncedCheckNickname = debounce(checkNickname, 500);
-
+  // Simple debounce implementation without useCallback
   useEffect(() => {
-    debouncedCheckNickname(nickname);
+    const timer = setTimeout(() => {
+      if (nickname) {
+        checkNickname(nickname);
+      } else {
+        setNicknameError('');
+        setSuggestions([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [nickname]);
 
   const handleNext = async () => {
@@ -101,7 +109,7 @@ export default function Step1() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${HOST_URL}/users/validate`, {
+      const response = await fetch(`${HOST_URL}/api/users/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,6 +129,7 @@ export default function Step1() {
       }
     } catch (error) {
       Alert.alert('Error', 'Error de conexión. Por favor, inténtelo de nuevo.');
+      console.log('Error validating email and nickname:', error);
     } finally {
       setLoading(false);
     }

@@ -2,31 +2,32 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
 import { colors } from '../theme/colors';
+import { HOST_URL } from '../config/config';
 
 export default function Step2() {
   const { email, nickname } = useLocalSearchParams();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [registrationCode, setRegistrationCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const validatePassword = (password) => {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+    // At least 8 characters, 1 letter, 1 number
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
     return passwordRegex.test(password);
   };
 
   const handleRegister = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Error', 'Please enter your first and last name');
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Por favor ingrese su nombre completo');
       return;
     }
 
     if (!validatePassword(password)) {
       Alert.alert(
         'Error',
-        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
+        'La contraseña debe tener al menos 8 caracteres y contener al menos una letra y un número'
       );
       return;
     }
@@ -38,17 +39,15 @@ export default function Step2() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/register', {
+      const response = await fetch(`${HOST_URL}/api/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email,
-          nickname,
-          firstName,
-          lastName,
+          fullName,
           password,
+          registrationCode,
         }),
       });
 
@@ -77,23 +76,22 @@ export default function Step2() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Complete Your Profile</Text>
-      <Text style={styles.subtitle}>Step 2: Enter your personal details</Text>
+      <Text style={styles.title}>Complete su perfil</Text>
+      <Text style={styles.subtitle}>Paso 2: Ingrese sus datos personales</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="First Name"
-        value={firstName}
-        onChangeText={setFirstName}
+        placeholder="Nombre completo"
+        value={fullName}
+        onChangeText={setFullName}
         autoCapitalize="words"
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Last Name"
-        value={lastName}
-        onChangeText={setLastName}
-        autoCapitalize="words"
+        placeholder="Código de registro"
+        value={registrationCode}
+        onChangeText={setRegistrationCode}
       />
 
       <TextInput
@@ -118,7 +116,7 @@ export default function Step2() {
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Creating Account...' : 'Create Account'}
+          {loading ? 'Creando Cuenta...' : 'Crear Cuenta'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
