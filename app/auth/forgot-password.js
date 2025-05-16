@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
+import { HOST_URL } from '../config/config';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -26,7 +27,7 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/send-reset-code', {
+      const response = await fetch(`${HOST_URL}/api/users/reset-password/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,8 +39,8 @@ export default function ForgotPassword() {
 
       if (response.ok) {
         Alert.alert(
-          'Verification Code Sent',
-          'Please check your email for the verification code. The code will expire in 30 minutes.',
+          'Código enviado',
+          'Por favor verifica tu correo electrónico. El código expira en 30 minutos.',
           [
             {
               text: 'OK',
@@ -51,10 +52,10 @@ export default function ForgotPassword() {
           ]
         );
       } else {
-        Alert.alert('Error', data.message || 'Failed to send verification code');
+        Alert.alert('Error', data.message || 'Error al enviar el código');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Problemas de conexión.');
     } finally {
       setLoading(false);
     }
@@ -62,9 +63,9 @@ export default function ForgotPassword() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Reset Password</Text>
+      <Text style={styles.title}>Recuperar contraseña</Text>
       <Text style={styles.subtitle}>
-        Enter your email address and we'll send you a verification code to reset your password.
+        Ingrese su correo electrónico para recibir un código de verificación.
       </Text>
 
       <View style={styles.inputContainer}>
@@ -88,7 +89,7 @@ export default function ForgotPassword() {
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Sending...' : 'Send Verification Code'}
+          {loading ? 'Enviando...' : 'Enviar código'}
         </Text>
       </TouchableOpacity>
 
@@ -96,7 +97,7 @@ export default function ForgotPassword() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>Back to Login</Text>
+        <Text style={styles.backButtonText}>Volver a Inicio de sesión</Text>
       </TouchableOpacity>
     </View>
   );

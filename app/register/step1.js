@@ -195,7 +195,7 @@ export default function Step1() {
         disabled={!isFormValid || loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Validating...' : 'Siguiente'}
+          {loading ? 'Validando...' : 'Siguiente'}
         </Text>
       </TouchableOpacity>
     </View>

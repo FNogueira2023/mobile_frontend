@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
+import { HOST_URL } from '../config/config';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -36,13 +37,13 @@ export default function Login() {
     const newErrors = {};
     
     if (!email) {
-      newErrors.email = 'Email is required';
+      newErrors.email = 'Se requiere un correo electrónico';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
+      newErrors.email = 'Por favor ingrese un correo electrónico válido';
     }
 
     if (!password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = 'Contraseña requerida';
     }
 
     setErrors(newErrors);
@@ -54,7 +55,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/login', {
+      const response = await fetch(`${HOST_URL}/api/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,10 +84,10 @@ export default function Login() {
         // Navigate to main app
         router.replace('/');
       } else {
-        Alert.alert('Error', data.message || 'Invalid email or password');
+        Alert.alert('Error', data.message || 'Email o contraseña incorrectos');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión. Por favor, inténtelo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -94,13 +95,13 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
+      <Text style={styles.title}>Bienvenido</Text>
+      <Text style={styles.subtitle}>Loguearse para continuar</Text>
 
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, errors.email && styles.inputError]}
-          placeholder="Email"
+          placeholder="Correo electrónico"
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -116,7 +117,7 @@ export default function Login() {
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, errors.password && styles.inputError]}
-          placeholder="Password"
+          placeholder="Contraseña"
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -136,10 +137,10 @@ export default function Login() {
             trackColor={{ false: colors.gray, true: colors.primary }}
             thumbColor={colors.white}
           />
-          <Text style={styles.rememberMeText}>Remember me</Text>
+          <Text style={styles.rememberMeText}>Recordarme</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/auth/forgot-password')}>
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          <Text style={styles.forgotPasswordText}>Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
       </View>
 
@@ -149,14 +150,14 @@ export default function Login() {
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? 'Cargando...' : 'Iniciar sesión'}
         </Text>
       </TouchableOpacity>
 
       <View style={styles.registerContainer}>
-        <Text style={styles.registerText}>Don't have an account? </Text>
+        <Text style={styles.registerText}>No estas registrado aún? </Text>
         <TouchableOpacity onPress={() => router.push('/register/step1')}>
-          <Text style={styles.registerLink}>Register</Text>
+          <Text style={styles.registerLink}>Registrarse</Text>
         </TouchableOpacity>
       </View>
     </View>

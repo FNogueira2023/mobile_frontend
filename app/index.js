@@ -33,6 +33,12 @@ export default function HomeScreen() {
         <Text style={styles.appTitle}>Recipe App</Text>
         <Text style={styles.subtitle}>Discover delicious recipes</Text>
         <TouchableOpacity 
+          style={styles.loginButton}
+          onPress={() => router.push('/auth/login')}
+        >
+          <Text style={styles.loginButtonText}>Login</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
           style={styles.registerButton}
           onPress={() => router.push('/register/step1')}
         >
@@ -61,6 +67,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.inputBackground,
+    alignItems: 'center',
   },
   welcomeText: {
     fontSize: 16,
@@ -78,12 +85,28 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 16,
   },
+  loginButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+    marginRight: 8,
+  },
+  loginButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   registerButton: {
     backgroundColor: colors.primary,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+    marginLeft: 8,
   },
   registerButtonText: {
     color: colors.white,

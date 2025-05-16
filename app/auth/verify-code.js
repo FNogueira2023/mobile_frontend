@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
+import { HOST_URL } from '../config/config';
 
 export default function VerifyCode() {
   const { email } = useLocalSearchParams();
@@ -41,26 +42,26 @@ export default function VerifyCode() {
 
   const handleVerifyAndReset = async () => {
     if (!code) {
-      setCodeError('Please enter the verification code');
+      setCodeError('Por favor ingrese el código de verificación');
       return;
     }
 
     if (!validatePassword(newPassword)) {
       setPasswordError(
-        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
+        'La contraseña debe tener al menos 8 caracteres y contener al menos una letra mayúscula, una minúscula y un número'
       );
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
+      setPasswordError('Las contraseñas no coinciden');
       return;
     }
 
     if (timeLeft <= 0) {
       Alert.alert(
-        'Code Expired',
-        'Your verification code has expired. Please request a new one.',
+        'Código expirado',	
+        'Tu código de verificación ha expirado. Por favor solicita uno nuevo.',
         [
           {
             text: 'OK',
@@ -73,14 +74,14 @@ export default function VerifyCode() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/verify-and-reset', {
+      const response = await fetch(`${HOST_URL}/api/users/reset-password/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email,
-          code,
+          resetCode: code,
           newPassword,
         }),
       });
@@ -88,9 +89,8 @@ export default function VerifyCode() {
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert(
-          'Success',
-          'Your password has been reset successfully.',
+        Alert.alert(          
+          'Tu contraseña ha sido cambiada exitosamente.',
           [
             {
               text: 'OK',
@@ -101,8 +101,8 @@ export default function VerifyCode() {
       } else {
         if (data.code === 'EXPIRED') {
           Alert.alert(
-            'Code Expired',
-            'Your verification code has expired. Please request a new one.',
+            'Código expirado',
+            'Tu código ha expirado.Por favor solicitar uno nuevo.',
             [
               {
                 text: 'OK',
@@ -111,13 +111,13 @@ export default function VerifyCode() {
             ]
           );
         } else if (data.code === 'INVALID') {
-          setCodeError('Invalid verification code');
+          setCodeError('Código inválido');
         } else {
-          Alert.alert('Error', data.message || 'Something went wrong');
+          Alert.alert('Error', data.message || 'Algo salió mal');
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión.');
     } finally {
       setLoading(false);
     }
@@ -126,7 +126,7 @@ export default function VerifyCode() {
   const handleResendCode = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://your-backend-url/api/send-reset-code', {
+      const response = await fetch(`${HOST_URL}/api/users/reset-password/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,8 +138,8 @@ export default function VerifyCode() {
 
       if (response.ok) {
         Alert.alert(
-          'Code Resent',
-          'A new verification code has been sent to your email.',
+          'Código reenviado',
+          'Un nuevo código de verificación ha sido enviado a tu correo electrónico.',
           [
             {
               text: 'OK',
@@ -152,10 +152,10 @@ export default function VerifyCode() {
           ]
         );
       } else {
-        Alert.alert('Error', data.message || 'Failed to resend code');
+        Alert.alert('Error', data.message || 'Error al reenviar el código');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión. Por favor, inténtelo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -163,28 +163,26 @@ export default function VerifyCode() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Verify Code</Text>
+      <Text style={styles.title}>Verificar Código</Text>
       <Text style={styles.subtitle}>
-        Enter the verification code sent to your email and set a new password.
+        Ingrese el código de verificación enviado a {email}. Asegúrese de que su bandeja de entrada no esté llena y revise la carpeta de spam.
       </Text>
 
       <View style={styles.timerContainer}>
         <Text style={styles.timerText}>
-          Code expires in: {formatTime(timeLeft)}
+          Código expira en: {formatTime(timeLeft)}
         </Text>
       </View>
 
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, codeError && styles.inputError]}
-          placeholder="Verification Code"
+          placeholder="Código de verificación"
           value={code}
           onChangeText={(text) => {
             setCode(text);
             setCodeError('');
-          }}
-          keyboardType="number-pad"
-          maxLength={6}
+          }}         
         />
         {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
       </View>
@@ -192,7 +190,7 @@ export default function VerifyCode() {
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, passwordError && styles.inputError]}
-          placeholder="New Password"
+          placeholder="Nueva Contraseña"
           value={newPassword}
           onChangeText={(text) => {
             setNewPassword(text);
@@ -205,7 +203,7 @@ export default function VerifyCode() {
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, passwordError && styles.inputError]}
-          placeholder="Confirm New Password"
+          placeholder="Confirmar Contraseña"
           value={confirmPassword}
           onChangeText={(text) => {
             setConfirmPassword(text);
@@ -222,7 +220,7 @@ export default function VerifyCode() {
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Verifying...' : 'Reset Password'}
+          {loading ? 'Verificando...' : 'Resetear Contraseña'}
         </Text>
       </TouchableOpacity>
 
@@ -231,7 +229,7 @@ export default function VerifyCode() {
         onPress={handleResendCode}
         disabled={loading}
       >
-        <Text style={styles.resendButtonText}>Resend Code</Text>
+        <Text style={styles.resendButtonText}>Reenviar Código</Text>
       </TouchableOpacity>
     </View>
   );
