@@ -1,9 +1,26 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from './theme/colors';
 
 export default function HomeScreen() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      setIsAuthenticated(!!token);
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setIsAuthenticated(false);
+    }
+  };
+
   // Temporary sample data - replace with actual API call later
   const recipes = [
     { id: '1', title: 'Spaghetti Carbonara', time: '30 mins', difficulty: 'Medium' },
@@ -35,18 +52,22 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>Discover delicious recipes</Text>
         </View>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={() => router.push('/auth/login')}
-          >
-            <Text style={styles.buttonText}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={() => router.push('/register/step1')}
-          >
-            <Text style={styles.buttonText}>Create Account</Text>
-          </TouchableOpacity>
+          {!isAuthenticated && (
+            <TouchableOpacity 
+              style={styles.button}
+              onPress={() => router.push('/auth/login')}
+            >
+              <Text style={styles.buttonText}>Login</Text>
+            </TouchableOpacity>
+          )}
+          {!isAuthenticated && (
+            <TouchableOpacity 
+              style={styles.button}
+              onPress={() => router.push('/register/step1')}
+            >
+              <Text style={styles.buttonText}>Create Account</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={styles.button}
             onPress={() => router.push('/auth/upgrade-to-student')}

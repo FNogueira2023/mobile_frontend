@@ -3,14 +3,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -24,14 +24,35 @@ export default function UpgradeToStudent() {
     cardNumber: '',
     idFront: null,
     idBack: null,
-    expiryDate: '',
-    cvv: '',
     paymentMethod: 'credit_card',
   });
 
   useEffect(() => {
-    loadUserId();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        Alert.alert(
+          'Acceso denegado',
+          'Debes iniciar sesión para acceder a esta página',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/auth/login'),
+            },
+          ]
+        );
+        return;
+      }
+      loadUserId();
+    } catch (error) {
+      console.error('Error al verificar autenticación:', error);
+      router.replace('/auth/login');
+    }
+  };
 
   const loadUserId = async () => {
     try {
@@ -87,18 +108,6 @@ export default function UpgradeToStudent() {
       newErrors.cardNumber = 'Número de tarjeta inválido';
     }
 
-    if (!formData.expiryDate) {
-      newErrors.expiryDate = 'Fecha de expiración es requerida';
-    } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(formData.expiryDate)) {
-      newErrors.expiryDate = 'Invalida fecha de expiración';
-    }
-
-    if (!formData.cvv) {
-      newErrors.cvv = 'CVV es requerido';
-    } else if (!/^\d{3,4}$/.test(formData.cvv)) {
-      newErrors.cvv = 'CVV inválido';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -111,8 +120,6 @@ export default function UpgradeToStudent() {
       const submitData = new FormData();
       submitData.append('userId', formData.userId);
       submitData.append('cardNumber', formData.cardNumber.replace(/\s/g, ''));
-      submitData.append('expiryDate', formData.expiryDate);
-      submitData.append('cvv', formData.cvv);
       
       if (formData.idFront) {
         submitData.append('idFront', {
@@ -213,39 +220,6 @@ export default function UpgradeToStudent() {
           maxLength={19}
         />
         {errors.cardNumber && <Text style={styles.errorText}>{errors.cardNumber}</Text>}
-
-        <View style={styles.cardDetailsContainer}>
-          <View style={styles.cardDetailInput}>
-            <TextInput
-              style={[styles.input, errors.expiryDate && styles.inputError]}
-              placeholder="MM/AA"
-              value={formData.expiryDate}
-              onChangeText={(text) => {
-                setFormData(prev => ({ ...prev, expiryDate: text }));
-                setErrors(prev => ({ ...prev, expiryDate: '' }));
-              }}
-              keyboardType="numeric"
-              maxLength={5}
-            />
-            {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
-          </View>
-
-          <View style={styles.cardDetailInput}>
-            <TextInput
-              style={[styles.input, errors.cvv && styles.inputError]}
-              placeholder="CVV"
-              value={formData.cvv}
-              onChangeText={(text) => {
-                setFormData(prev => ({ ...prev, cvv: text }));
-                setErrors(prev => ({ ...prev, cvv: '' }));
-              }}
-              keyboardType="numeric"
-              maxLength={4}
-              secureTextEntry
-            />
-            {errors.cvv && <Text style={styles.errorText}>{errors.cvv}</Text>}
-          </View>
-        </View>
       </View>
 
       <TouchableOpacity
@@ -328,13 +302,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 10,
-  },
-  cardDetailsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardDetailInput: {
-    width: '48%',
   },
   button: {
     backgroundColor: colors.primary,
