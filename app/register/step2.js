@@ -1,8 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
-import { colors } from '../theme/colors';
 import { HOST_URL } from '../config/config';
+import { colors } from '../theme/colors';
 
 export default function Step2() {
   const { email, nickname } = useLocalSearchParams();
@@ -55,8 +55,8 @@ export default function Step2() {
 
       if (response.ok) {
         Alert.alert(
-          'Success',
-          'Registration successful! Please log in.',
+          'Exito',
+          'Registro exitoso! Por favor inicie sesión.',
           [
             {
               text: 'OK',
@@ -65,10 +65,10 @@ export default function Step2() {
           ]
         );
       } else {
-        Alert.alert('Error', data.message || 'Something went wrong');
+        Alert.alert('Error', data.message || 'Algo salió mal. Por favor intente de nuevo.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión.');
     } finally {
       setLoading(false);
     }

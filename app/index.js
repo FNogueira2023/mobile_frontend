@@ -29,21 +29,31 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome to</Text>
-        <Text style={styles.appTitle}>Recipe App</Text>
-        <Text style={styles.subtitle}>Discover delicious recipes</Text>
-        <TouchableOpacity 
-          style={styles.loginButton}
-          onPress={() => router.push('/auth/login')}
-        >
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.registerButton}
-          onPress={() => router.push('/register/step1')}
-        >
-          <Text style={styles.registerButtonText}>Create Account</Text>
-        </TouchableOpacity>
+        <View style={styles.headerTop}>
+          <Text style={styles.welcomeText}>Welcome to</Text>
+          <Text style={styles.appTitle}>Recipe App</Text>
+          <Text style={styles.subtitle}>Discover delicious recipes</Text>
+        </View>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={styles.buttonText}>Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/register/step1')}
+          >
+            <Text style={styles.buttonText}>Create Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/auth/upgrade-to-student')}
+          >
+            <Text style={styles.buttonText}>Upgrade to Student</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       <FlatList
@@ -67,7 +77,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.inputBackground,
+  },
+  headerTop: {
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  button: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 4,
+  },
+  buttonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   welcomeText: {
     fontSize: 16,
@@ -109,6 +142,19 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   registerButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  upgradeButton: {
+    backgroundColor: colors.secondary,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+    marginLeft: 8,
+  },
+  upgradeButtonText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',

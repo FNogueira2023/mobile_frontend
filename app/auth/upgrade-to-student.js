@@ -1,36 +1,57 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
+
 
 export default function UpgradeToStudent() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
-    studentId: '',
-    paymentMethod: 'credit_card', // Default payment method
+    userId: '',
+    cardNumber: '',
     idFront: null,
     idBack: null,
-    cardNumber: '',
     expiryDate: '',
     cvv: '',
+    paymentMethod: 'credit_card',
   });
+
+  useEffect(() => {
+    loadUserId();
+  }, []);
+
+  const loadUserId = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        router.replace('/auth/login');
+        return;
+      }
+      setFormData(prev => ({ ...prev, userId: 'user123' }));
+    } catch (error) {
+      console.error('Error al cargar ID de Usuario:', error);
+      router.replace('/auth/login');
+    }
+  };
 
   const pickImage = async (type) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload ID photos.');
+      Alert.alert('Permiso requerido', 'Por favor permita utilizar camara para subir fotos.');
       return;
     }
 
@@ -52,36 +73,30 @@ export default function UpgradeToStudent() {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.studentId) {
-      newErrors.studentId = 'Student ID is required';
-    }
-
     if (!formData.idFront) {
-      newErrors.idFront = 'Front ID photo is required';
+      newErrors.idFront = 'Foto frontal de ID es requerida';
     }
 
     if (!formData.idBack) {
-      newErrors.idBack = 'Back ID photo is required';
+      newErrors.idBack = 'Foto trasera de ID es requerida';
     }
 
-    if (formData.paymentMethod === 'credit_card') {
-      if (!formData.cardNumber) {
-        newErrors.cardNumber = 'Card number is required';
-      } else if (!/^\d{16}$/.test(formData.cardNumber.replace(/\s/g, ''))) {
-        newErrors.cardNumber = 'Invalid card number';
-      }
+    if (!formData.cardNumber) {
+      newErrors.cardNumber = 'Tarjeta de crédito es requerida';
+    } else if (!/^\d{16}$/.test(formData.cardNumber.replace(/\s/g, ''))) {
+      newErrors.cardNumber = 'Número de tarjeta inválido';
+    }
 
-      if (!formData.expiryDate) {
-        newErrors.expiryDate = 'Expiry date is required';
-      } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(formData.expiryDate)) {
-        newErrors.expiryDate = 'Invalid expiry date (MM/YY)';
-      }
+    if (!formData.expiryDate) {
+      newErrors.expiryDate = 'Fecha de expiración es requerida';
+    } else if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(formData.expiryDate)) {
+      newErrors.expiryDate = 'Invalida fecha de expiración';
+    }
 
-      if (!formData.cvv) {
-        newErrors.cvv = 'CVV is required';
-      } else if (!/^\d{3,4}$/.test(formData.cvv)) {
-        newErrors.cvv = 'Invalid CVV';
-      }
+    if (!formData.cvv) {
+      newErrors.cvv = 'CVV es requerido';
+    } else if (!/^\d{3,4}$/.test(formData.cvv)) {
+      newErrors.cvv = 'CVV inválido';
     }
 
     setErrors(newErrors);
@@ -93,10 +108,11 @@ export default function UpgradeToStudent() {
 
     setLoading(true);
     try {
-      // Create FormData for multipart/form-data
       const submitData = new FormData();
-      submitData.append('studentId', formData.studentId);
-      submitData.append('paymentMethod', formData.paymentMethod);
+      submitData.append('userId', formData.userId);
+      submitData.append('cardNumber', formData.cardNumber.replace(/\s/g, ''));
+      submitData.append('expiryDate', formData.expiryDate);
+      submitData.append('cvv', formData.cvv);
       
       if (formData.idFront) {
         submitData.append('idFront', {
@@ -114,13 +130,7 @@ export default function UpgradeToStudent() {
         });
       }
 
-      if (formData.paymentMethod === 'credit_card') {
-        submitData.append('cardNumber', formData.cardNumber);
-        submitData.append('expiryDate', formData.expiryDate);
-        submitData.append('cvv', formData.cvv);
-      }
-
-      const response = await fetch('http://your-backend-url/api/upgrade-to-student', {
+      const response = await fetch(`${HOST_URL}/api/students/upgrade`, {
         method: 'POST',
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -132,20 +142,18 @@ export default function UpgradeToStudent() {
 
       if (response.ok) {
         Alert.alert(
-          'Success',
-          'Your account has been upgraded to Student status!',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/'),
-            },
-          ]
+          'Exito',
+          'Tu cuenta ha sido actualizada a Estudiante!',
+          [{
+            text: 'OK',
+            onPress: () => router.replace('/'),
+          }]
         );
       } else {
-        Alert.alert('Error', data.message || 'Failed to upgrade account');
+        Alert.alert('Error', data.message || 'Error al actualizar la cuenta');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      Alert.alert('Error', 'Error de conexión.');
     } finally {
       setLoading(false);
     }
@@ -153,27 +161,13 @@ export default function UpgradeToStudent() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Upgrade to Student Account</Text>
+      <Text style={styles.title}>Actualizar a cuenta de Estudiante</Text>
       <Text style={styles.subtitle}>
-        Please provide your student ID and payment information to access premium features.
+        Por favor sube una foto de tu ID y la información de pago para completar la actualización.
       </Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Student Information</Text>
-        <TextInput
-          style={[styles.input, errors.studentId && styles.inputError]}
-          placeholder="Student ID"
-          value={formData.studentId}
-          onChangeText={(text) => {
-            setFormData(prev => ({ ...prev, studentId: text }));
-            setErrors(prev => ({ ...prev, studentId: '' }));
-          }}
-        />
-        {errors.studentId ? <Text style={styles.errorText}>{errors.studentId}</Text> : null}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>ID Verification</Text>
+        <Text style={styles.sectionTitle}>Verificación ID</Text>
         <View style={styles.photoContainer}>
           <View style={styles.photoUpload}>
             <TouchableOpacity
@@ -183,10 +177,10 @@ export default function UpgradeToStudent() {
               {formData.idFront ? (
                 <Image source={{ uri: formData.idFront }} style={styles.photoPreview} />
               ) : (
-                <Text style={styles.photoButtonText}>Upload Front ID</Text>
+                <Text style={styles.photoButtonText}>Cargar Foto Frontal</Text>
               )}
             </TouchableOpacity>
-            {errors.idFront ? <Text style={styles.errorText}>{errors.idFront}</Text> : null}
+            {errors.idFront && <Text style={styles.errorText}>{errors.idFront}</Text>}
           </View>
 
           <View style={styles.photoUpload}>
@@ -197,86 +191,61 @@ export default function UpgradeToStudent() {
               {formData.idBack ? (
                 <Image source={{ uri: formData.idBack }} style={styles.photoPreview} />
               ) : (
-                <Text style={styles.photoButtonText}>Upload Back ID</Text>
+                <Text style={styles.photoButtonText}>Cargar Foto Trasera</Text>
               )}
             </TouchableOpacity>
-            {errors.idBack ? <Text style={styles.errorText}>{errors.idBack}</Text> : null}
+            {errors.idBack && <Text style={styles.errorText}>{errors.idBack}</Text>}
           </View>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Payment Information</Text>
-        <View style={styles.paymentMethodContainer}>
-          <TouchableOpacity
-            style={[
-              styles.paymentMethod,
-              formData.paymentMethod === 'credit_card' && styles.paymentMethodSelected,
-            ]}
-            onPress={() => setFormData(prev => ({ ...prev, paymentMethod: 'credit_card' }))}
-          >
-            <Text style={styles.paymentMethodText}>Credit Card</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.paymentMethod,
-              formData.paymentMethod === 'paypal' && styles.paymentMethodSelected,
-            ]}
-            onPress={() => setFormData(prev => ({ ...prev, paymentMethod: 'paypal' }))}
-          >
-            <Text style={styles.paymentMethodText}>PayPal</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.sectionTitle}>información de Pago</Text>
+        <TextInput
+          style={[styles.input, errors.cardNumber && styles.inputError]}
+          placeholder="Tarjeta de Crédito (16 dígitos)"
+          value={formData.cardNumber}
+          onChangeText={(text) => {
+            setFormData(prev => ({ ...prev, cardNumber: text }));
+            setErrors(prev => ({ ...prev, cardNumber: '' }));
+          }}
+          keyboardType="numeric"
+          maxLength={19}
+        />
+        {errors.cardNumber && <Text style={styles.errorText}>{errors.cardNumber}</Text>}
 
-        {formData.paymentMethod === 'credit_card' && (
-          <>
+        <View style={styles.cardDetailsContainer}>
+          <View style={styles.cardDetailInput}>
             <TextInput
-              style={[styles.input, errors.cardNumber && styles.inputError]}
-              placeholder="Card Number"
-              value={formData.cardNumber}
+              style={[styles.input, errors.expiryDate && styles.inputError]}
+              placeholder="MM/AA"
+              value={formData.expiryDate}
               onChangeText={(text) => {
-                setFormData(prev => ({ ...prev, cardNumber: text }));
-                setErrors(prev => ({ ...prev, cardNumber: '' }));
+                setFormData(prev => ({ ...prev, expiryDate: text }));
+                setErrors(prev => ({ ...prev, expiryDate: '' }));
               }}
               keyboardType="numeric"
-              maxLength={19}
+              maxLength={5}
             />
-            {errors.cardNumber ? <Text style={styles.errorText}>{errors.cardNumber}</Text> : null}
+            {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
+          </View>
 
-            <View style={styles.cardDetailsContainer}>
-              <View style={styles.cardDetailInput}>
-                <TextInput
-                  style={[styles.input, errors.expiryDate && styles.inputError]}
-                  placeholder="MM/YY"
-                  value={formData.expiryDate}
-                  onChangeText={(text) => {
-                    setFormData(prev => ({ ...prev, expiryDate: text }));
-                    setErrors(prev => ({ ...prev, expiryDate: '' }));
-                  }}
-                  keyboardType="numeric"
-                  maxLength={5}
-                />
-                {errors.expiryDate ? <Text style={styles.errorText}>{errors.expiryDate}</Text> : null}
-              </View>
-
-              <View style={styles.cardDetailInput}>
-                <TextInput
-                  style={[styles.input, errors.cvv && styles.inputError]}
-                  placeholder="CVV"
-                  value={formData.cvv}
-                  onChangeText={(text) => {
-                    setFormData(prev => ({ ...prev, cvv: text }));
-                    setErrors(prev => ({ ...prev, cvv: '' }));
-                  }}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  secureTextEntry
-                />
-                {errors.cvv ? <Text style={styles.errorText}>{errors.cvv}</Text> : null}
-              </View>
-            </View>
-          </>
-        )}
+          <View style={styles.cardDetailInput}>
+            <TextInput
+              style={[styles.input, errors.cvv && styles.inputError]}
+              placeholder="CVV"
+              value={formData.cvv}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, cvv: text }));
+                setErrors(prev => ({ ...prev, cvv: '' }));
+              }}
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+            />
+            {errors.cvv && <Text style={styles.errorText}>{errors.cvv}</Text>}
+          </View>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -285,7 +254,7 @@ export default function UpgradeToStudent() {
         disabled={loading}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Processing...' : 'Upgrade Account'}
+          {loading ? 'Procesando...' : 'Actualizar Cuenta'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -360,27 +329,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 10,
   },
-  paymentMethodContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  paymentMethod: {
-    flex: 1,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    marginRight: 10,
-    alignItems: 'center',
-  },
-  paymentMethodSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + '20',
-  },
-  paymentMethodText: {
-    color: colors.text,
-    fontWeight: 'bold',
-  },
   cardDetailsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -403,4 +351,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-}); 
+});
