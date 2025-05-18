@@ -98,6 +98,12 @@ export default function HomeScreen() {
                 <Text style={[styles.buttonText, styles.createButtonText]}>Crear Receta</Text>
               </TouchableOpacity>
               <TouchableOpacity 
+                style={[styles.button, styles.myRecipesButton]}
+                onPress={() => router.push('/recipes/my-recipes')}
+              >
+                <Text style={[styles.buttonText, styles.myRecipesButtonText]}>Mis Recetas</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
                 style={[styles.button, styles.logoutButton]}
                 onPress={handleLogout}
               >
@@ -223,6 +229,13 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   createButtonText: {
+    color: colors.white,
+  },
+  myRecipesButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  myRecipesButtonText: {
     color: colors.white,
   },
 }); 

@@ -49,6 +49,7 @@ export default function CreateRecipe() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeUnitIndex, setActiveUnitIndex] = useState(null);
   const [isDifficultyModalVisible, setIsDifficultyModalVisible] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     checkAuth();
@@ -295,20 +296,38 @@ export default function CreateRecipe() {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const userId = await AsyncStorage.getItem('userId');
+      setLoading(true);
+      setError(null);
 
-      if (!token || !userId) {
-        Alert.alert('Error', 'Sesión expirada. Por favor, inicia sesión nuevamente.');
-        router.replace('/auth/login');
+      // Validar campos requeridos
+      if (!formData.title || !formData.description || !formData.instructions || !formData.prepTime || !formData.cookTime || !formData.servings || !formData.difficulty) {
+        setError('Por favor complete todos los campos requeridos');
+        setLoading(false);
+        return;
+      }
+
+      // Validar ingredientes
+      if (formData.ingredients.length === 0) {
+        setError('Debe agregar al menos un ingrediente');
+        setLoading(false);
+        return;
+      }
+
+      // Validar imagen
+      if (!formData.imageUrl) {
+        setError('Debe seleccionar una imagen');
+        setLoading(false);
         return;
       }
 
       const submitData = new FormData();
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        setError('Error: Usuario no encontrado. Por favor, inicie sesión nuevamente.');
+        setLoading(false);
+        return;
+      }
       submitData.append('userId', userId);
       submitData.append('title', formData.title);
       submitData.append('description', formData.description);
@@ -319,49 +338,105 @@ export default function CreateRecipe() {
       submitData.append('difficulty', formData.difficulty);
       submitData.append('isPublic', formData.isPublic.toString());
       submitData.append('ingredients', JSON.stringify(formData.ingredients));
-      
-      if (formData.imageUrl) {
-        const filename = formData.imageUrl.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        submitData.append('imageUrl', {
-          uri: formData.imageUrl,
-          type: type,
-          name: filename,
-        });
-      }
+      submitData.append('imageUrl', {
+        uri: formData.imageUrl,
+        type: 'image/jpeg',
+        name: 'recipe-image.jpg'
+      });
+
+      const token = await AsyncStorage.getItem('authToken');
 
       const response = await fetch(`${HOST_URL}/api/recipes`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
         },
-        body: submitData,
+        body: submitData
       });
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.status === 409) {
+        // Receta existente encontrada
         Alert.alert(
-          'Éxito',
-          'Receta creada exitosamente',
-          [{
-            text: 'OK',
-            onPress: () => router.replace('/recipes'),
-          }]
+          'Receta existente',
+          'Ya existe una receta con este nombre. ¿Qué desea hacer?',
+          [
+            {
+              text: 'Reemplazar',
+              onPress: () => handleRecipeAction('replace', submitData)
+            },
+            {
+              text: 'Editar',
+              onPress: () => handleRecipeAction('edit', submitData)
+            },
+            {
+              text: 'Cancelar',
+              style: 'cancel'
+            }
+          ]
         );
-      } else {
-        if (response.status === 401) {
-          Alert.alert('Error', 'Sesión expirada. Por favor, inicia sesión nuevamente.');
-          router.replace('/auth/login');
-        } else {
-          Alert.alert('Error', data.message || 'Error al crear la receta');
-        }
+        setLoading(false);
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al crear la receta');
+      }
+
+      Alert.alert(
+        'Éxito',
+        'Receta creada exitosamente',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/recipes/my-recipes')
+          }
+        ]
+      );
+
     } catch (error) {
-      console.error('Error en submit:', error);
-      Alert.alert('Error', 'Error de conexión.');
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecipeAction = async (action, submitData) => {
+    try {
+      setLoading(true);
+      submitData.append('action', action);
+
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${HOST_URL}/api/recipes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: submitData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Error al ${action === 'replace' ? 'reemplazar' : 'editar'} la receta`);
+      }
+
+      Alert.alert(
+        'Éxito',
+        `Receta ${action === 'replace' ? 'reemplazada' : 'editada'} exitosamente`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/recipes/my-recipes')
+          }
+        ]
+      );
+
+    } catch (error) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }
