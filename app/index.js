@@ -90,12 +90,20 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity 
-              style={[styles.button, styles.logoutButton]}
-              onPress={handleLogout}
-            >
-              <Text style={[styles.buttonText, styles.logoutButtonText]}>Cerrar Sesión</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity 
+                style={[styles.button, styles.createButton]}
+                onPress={() => router.push('/recipes/create-recipe')}
+              >
+                <Text style={[styles.buttonText, styles.createButtonText]}>Crear Receta</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.button, styles.logoutButton]}
+                onPress={handleLogout}
+              >
+                <Text style={[styles.buttonText, styles.logoutButtonText]}>Cerrar Sesión</Text>
+              </TouchableOpacity>
+            </>
           )}
           <TouchableOpacity 
             style={styles.button}
@@ -209,5 +217,12 @@ const styles = StyleSheet.create({
   recipeDifficulty: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  createButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  createButtonText: {
+    color: colors.white,
   },
 }); 
