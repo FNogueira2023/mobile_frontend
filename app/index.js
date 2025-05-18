@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from './theme/colors';
 
 export default function HomeScreen() {
@@ -18,6 +18,27 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userId');
+      setIsAuthenticated(false);
+      Alert.alert(
+        'Sesión cerrada',
+        'Has cerrado sesión exitosamente',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      Alert.alert('Error', 'No se pudo cerrar la sesión');
     }
   };
 
@@ -47,25 +68,33 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.welcomeText}>Welcome to</Text>
+          <Text style={styles.welcomeText}>Bienvenido a</Text>
           <Text style={styles.appTitle}>Recipe App</Text>
-          <Text style={styles.subtitle}>Discover delicious recipes</Text>
+          <Text style={styles.subtitle}>Descubre y comparte tus recetas favoritas</Text>
         </View>
+        
         <View style={styles.buttonContainer}>
-          {!isAuthenticated && (
+          {!isAuthenticated ? (
+            <>
+              <TouchableOpacity 
+                style={styles.button}
+                onPress={() => router.push('/auth/login')}
+              >
+                <Text style={styles.buttonText}>Login</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.button}
+                onPress={() => router.push('/register/step1')}
+              >
+                <Text style={styles.buttonText}>Create Account</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity 
-              style={styles.button}
-              onPress={() => router.push('/auth/login')}
+              style={[styles.button, styles.logoutButton]}
+              onPress={handleLogout}
             >
-              <Text style={styles.buttonText}>Login</Text>
-            </TouchableOpacity>
-          )}
-          {!isAuthenticated && (
-            <TouchableOpacity 
-              style={styles.button}
-              onPress={() => router.push('/register/step1')}
-            >
-              <Text style={styles.buttonText}>Create Account</Text>
+              <Text style={[styles.buttonText, styles.logoutButtonText]}>Cerrar Sesión</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity 
@@ -123,6 +152,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  logoutButton: {
+    backgroundColor: colors.error,
+    borderColor: colors.error,
+  },
+  logoutButtonText: {
+    color: colors.white,
+  },
   welcomeText: {
     fontSize: 16,
     color: colors.textSecondary,
@@ -138,47 +174,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     marginBottom: 16,
-  },
-  loginButton: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-    marginRight: 8,
-  },
-  loginButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  registerButton: {
-    backgroundColor: colors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-    marginLeft: 8,
-  },
-  registerButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  upgradeButton: {
-    backgroundColor: colors.secondary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-    marginLeft: 8,
-  },
-  upgradeButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   listContainer: {
     padding: 16,

@@ -3,14 +3,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -117,8 +117,17 @@ export default function UpgradeToStudent() {
 
     setLoading(true);
     try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userId = await AsyncStorage.getItem('userId');
+
+      if (!token || !userId) {
+        Alert.alert('Error', 'Sesión expirada. Por favor, inicia sesión nuevamente.');
+        router.replace('/auth/login');
+        return;
+      }
+
       const submitData = new FormData();
-      submitData.append('userId', formData.userId);
+      submitData.append('userId', userId);
       submitData.append('cardNumber', formData.cardNumber.replace(/\s/g, ''));
       
       if (formData.idFront) {
@@ -140,6 +149,7 @@ export default function UpgradeToStudent() {
       const response = await fetch(`${HOST_URL}/api/students/upgrade`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
         body: submitData,
@@ -157,9 +167,15 @@ export default function UpgradeToStudent() {
           }]
         );
       } else {
-        Alert.alert('Error', data.message || 'Error al actualizar la cuenta');
+        if (response.status === 401) {
+          Alert.alert('Error', 'Sesión expirada. Por favor, inicia sesión nuevamente.');
+          router.replace('/auth/login');
+        } else {
+          Alert.alert('Error', data.message || 'Error al actualizar la cuenta');
+        }
       }
     } catch (error) {
+      console.error('Error en submit:', error);
       Alert.alert('Error', 'Error de conexión.');
     } finally {
       setLoading(false);

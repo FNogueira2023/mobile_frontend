@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { colors } from '../theme/colors';
 import { HOST_URL } from '../config/config';
+import { colors } from '../theme/colors';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -55,6 +55,7 @@ export default function Login() {
 
     setLoading(true);
     try {
+      console.log('Iniciando login...');
       const response = await fetch(`${HOST_URL}/api/users/login`, {
         method: 'POST',
         headers: {
@@ -64,6 +65,7 @@ export default function Login() {
       });
 
       const data = await response.json();
+      console.log('Respuesta del servidor:', data);
 
       if (response.ok) {
         // Save credentials if remember me is checked
@@ -78,15 +80,31 @@ export default function Login() {
           await AsyncStorage.removeItem('rememberMe');
         }
 
-        // Save auth token
+        // Save auth token and userId
+        console.log('Verificando datos de sesión:');
+        console.log('Token presente:', !!data.token);
+        console.log('User object presente:', !!data.user);
+        console.log('UserId presente:', !!data.user?.userId);
+        console.log('Datos completos:', data);
+
+        if (!data.token || !data.user?.userId) {
+          console.log('Datos incompletos en la respuesta');
+          Alert.alert('Error', 'Datos de sesión incompletos');
+          return;
+        }
+
         await AsyncStorage.setItem('authToken', data.token);
+        await AsyncStorage.setItem('userId', data.user.userId.toString());
+        console.log('Datos guardados exitosamente');
 
         // Navigate to main app
         router.replace('/');
       } else {
+        console.log('Error en la respuesta:', data.message);
         Alert.alert('Error', data.message || 'Email o contraseña incorrectos');
       }
     } catch (error) {
+      console.error('Error en login:', error);
       Alert.alert('Error', 'Error de conexión. Por favor, inténtelo de nuevo.');
     } finally {
       setLoading(false);
