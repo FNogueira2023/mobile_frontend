@@ -19,13 +19,13 @@ import { colors } from '../theme/colors';
 
 // Lista de unidades comunes para recetas
 const UNITS = [
-  { id: 'g', name: 'Gramos (g)' },
-  { id: 'kg', name: 'Kilogramos (kg)' },
-  { id: 'ml', name: 'Mililitros (ml)' },
-  { id: 'l', name: 'Litros (l)' },
-  { id: 'tbsp', name: 'Cucharada (tbsp)'},
-  { id: 'cup', name: 'Taza (cup)' },
-  { id: 'unit', name: 'Unidad' }
+  { abbreviation: 'g', name: 'Gramos (g)' },
+  { abbreviation: 'kg', name: 'Kilogramos (kg)' },
+  { abbreviation: 'ml', name: 'Mililitros (ml)' },
+  { abbreviation: 'l', name: 'Litros (l)' },
+  { abbreviation: 'tbsp', name: 'Cucharada (tbsp)'},
+  { abbreviation: 'cup', name: 'Taza (cup)' },
+  { abbreviation: 'unit', name: 'Unidad' }
 ];
 
 export default function CreateRecipe() {
@@ -43,7 +43,7 @@ export default function CreateRecipe() {
     difficulty: 'medium',
     isPublic: false,
     imageUrl: null,
-    ingredients: [{ ingredientId: '', quantity: '', unitId: '' }]
+    ingredients: [{ name: '', amount: '', unit: '' }]
   });
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -89,9 +89,27 @@ export default function CreateRecipe() {
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
+      allowsMultipleSelection: false,
+      exif: false,
     });
 
     if (!result.canceled) {
+      // Verificar el tamaño del archivo
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+      
+      if (blob.size > 5 * 1024 * 1024) { // 5MB
+        Alert.alert('Error', 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
+        return;
+      }
+
+      // Verificar la extensión del archivo
+      const fileExtension = result.assets[0].uri.split('.').pop().toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        Alert.alert('Error', 'Solo se permiten archivos de imagen (jpg, jpeg, png, gif).');
+        return;
+      }
+
       setFormData(prev => ({
         ...prev,
         imageUrl: result.assets[0].uri
@@ -102,7 +120,7 @@ export default function CreateRecipe() {
   const addIngredient = () => {
     setFormData(prev => ({
       ...prev,
-      ingredients: [...prev.ingredients, { ingredientId: '', quantity: '', unitId: '' }]
+      ingredients: [...prev.ingredients, { name: '', amount: '', unit: '' }]
     }));
   };
 
@@ -149,7 +167,7 @@ export default function CreateRecipe() {
               setFormData(prev => ({
                 ...prev,
                 ingredients: prev.ingredients.map((ing, i) => 
-                  i === index ? { ...ing, unitId: unit.id, unitText: unit.name } : ing
+                  i === index ? { ...ing, unit: unit.abbreviation, unitText: unit.name } : ing
                 )
               }));
             }
@@ -164,21 +182,21 @@ export default function CreateRecipe() {
   };
 
   const handleSuggestionPress = (index, unit) => {
-    updateIngredient(index, 'unitId', unit.id);
+    updateIngredient(index, 'unit', unit.abbreviation);
     setShowSuggestions(false);
     setActiveUnitIndex(null);
   };
 
-  const getUnitName = (unitId) => {
-    const unit = UNITS.find(u => u.id === unitId);
+  const getUnitName = (abbreviation) => {
+    const unit = UNITS.find(u => u.abbreviation === abbreviation);
     return unit ? unit.name : '';
   };
 
-  const getUnitDisplay = (index, unitId) => {
+  const getUnitDisplay = (index, abbreviation) => {
     if (activeUnitIndex === index) {
       return '';
     }
-    return getUnitName(unitId);
+    return getUnitName(abbreviation);
   };
 
   const DIFFICULTY_OPTIONS = [
@@ -259,13 +277,15 @@ export default function CreateRecipe() {
 
     // Validate ingredients
     formData.ingredients.forEach((ing, index) => {
-      if (!ing.ingredientId) {
+      if (!ing.name) {
         newErrors[`ingredient_${index}`] = 'El ingrediente es requerido';
       }
-      if (!ing.quantity) {
+      if (!ing.amount) {
         newErrors[`quantity_${index}`] = 'La cantidad es requerida';
+      } else if (isNaN(ing.amount) || ing.amount <= 0) {
+        newErrors[`quantity_${index}`] = 'La cantidad debe ser un número positivo';
       }
-      if (!ing.unitId) {
+      if (!ing.unit) {
         newErrors[`unit_${index}`] = 'La unidad es requerida';
       }
     });
@@ -301,10 +321,14 @@ export default function CreateRecipe() {
       submitData.append('ingredients', JSON.stringify(formData.ingredients));
       
       if (formData.imageUrl) {
+        const filename = formData.imageUrl.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
         submitData.append('imageUrl', {
           uri: formData.imageUrl,
-          type: 'image/jpeg',
-          name: 'recipe.jpg',
+          type: type,
+          name: filename,
         });
       }
 
@@ -312,7 +336,6 @@ export default function CreateRecipe() {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
         },
         body: submitData,
       });
@@ -351,7 +374,7 @@ export default function CreateRecipe() {
 
   const handleUnitSelect = (unit) => {
     if (selectedUnitIndex !== null) {
-      updateIngredient(selectedUnitIndex, 'unitId', unit.id);
+      updateIngredient(selectedUnitIndex, 'unit', unit.abbreviation);
       setIsUnitModalVisible(false);
     }
   };
@@ -364,9 +387,9 @@ export default function CreateRecipe() {
       <View style={styles.radioContainer}>
         <View style={[
           styles.radio,
-          formData.ingredients[selectedUnitIndex]?.unitId === item.id && styles.radioSelected
+          formData.ingredients[selectedUnitIndex]?.unit === item.abbreviation && styles.radioSelected
         ]}>
-          {formData.ingredients[selectedUnitIndex]?.unitId === item.id && (
+          {formData.ingredients[selectedUnitIndex]?.unit === item.abbreviation && (
             <View style={styles.radioInner} />
           )}
         </View>
@@ -410,7 +433,7 @@ export default function CreateRecipe() {
           <View style={styles.halfInput}>
             <TextInput
               style={[styles.input, errors.prepTime && styles.inputError]}
-              placeholder="Tiempo de preparación (min)"
+              placeholder="Tiempo Prep (min)"
               value={formData.prepTime}
               onChangeText={(text) => {
                 setFormData(prev => ({ ...prev, prepTime: text }));
@@ -424,7 +447,7 @@ export default function CreateRecipe() {
           <View style={styles.halfInput}>
             <TextInput
               style={[styles.input, errors.cookTime && styles.inputError]}
-              placeholder="Tiempo de cocción (min)"
+              placeholder="Tiempo cocción (min)"
               value={formData.cookTime}
               onChangeText={(text) => {
                 setFormData(prev => ({ ...prev, cookTime: text }));
@@ -487,14 +510,14 @@ export default function CreateRecipe() {
               <TextInput
                 style={[styles.input, styles.ingredientInput, errors[`ingredient_${index}`] && styles.inputError]}
                 placeholder="Ingrediente"
-                value={ingredient.ingredientId}
-                onChangeText={(text) => updateIngredient(index, 'ingredientId', text)}
+                value={ingredient.name}
+                onChangeText={(text) => updateIngredient(index, 'name', text)}
               />
               <TextInput
                 style={[styles.input, styles.quantityInput, errors[`quantity_${index}`] && styles.inputError]}
                 placeholder="Cantidad"
-                value={ingredient.quantity}
-                onChangeText={(text) => updateIngredient(index, 'quantity', text)}
+                value={ingredient.amount}
+                onChangeText={(text) => updateIngredient(index, 'amount', text)}
                 keyboardType="numeric"
               />
               <TouchableOpacity
@@ -502,7 +525,7 @@ export default function CreateRecipe() {
                 onPress={() => showUnitPicker(index)}
               >
                 <Text style={styles.unitText}>
-                  {getUnitName(ingredient.unitId) || 'Seleccionar unidad'}
+                  {getUnitName(ingredient.unit) || 'Unidad'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -560,7 +583,7 @@ export default function CreateRecipe() {
           <FlatList
             data={UNITS}
             renderItem={renderUnitItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.abbreviation}
             style={styles.unitList}
           />
           <TouchableOpacity
@@ -684,7 +707,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   ingredientInput: {
-    flex: 2,
+    flex: 1.5,
   },
   quantityInput: {
     flex: 1,
