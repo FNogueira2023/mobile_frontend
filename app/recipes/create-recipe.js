@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
+import { jwtDecode } from 'jwt-decode';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -414,43 +415,164 @@ export default function CreateRecipe() {
         return;
       }
 
-      if (isCharging) {
-        Alert.alert(
-          'Conexión con cargo',
-          'Estás usando una red con cargo. ¿Deseas continuar con la carga de la receta?',
-          [
-            {
-              text: 'Cancelar',
-              style: 'cancel',
-            },
-            {
-              text: 'Guardar localmente',
-              onPress: async () => {
-                await savePendingRecipe(recipeData);
-                Alert.alert(
-                  'Receta guardada',
-                  'La receta se guardará localmente y se subirá cuando haya una conexión sin cargo.'
-                );
-                router.back();
-              },
-            },
-            {
-              text: 'Continuar',
-              onPress: async () => {
-                await uploadRecipe(recipeData);
-              },
-            },
-          ]
-        );
-        return;
+      // Si hay conexión, intentar subir directamente
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          throw new Error('No hay token de autenticación');
+        }
+
+        // Decodificar el token usando jwt-decode
+        const decodedToken = jwtDecode(token);
+        console.log('Token decodificado:', decodedToken);
+
+        // Intentar obtener el userId de diferentes campos posibles
+        const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
+        
+        if (!userId) {
+          console.error('Token decodificado no contiene userId:', decodedToken);
+          throw new Error('No se pudo obtener el ID del usuario del token');
+        }
+
+        // Preparar la imagen para enviar
+        let imageBase64 = null;
+        if (formData.imageUrl) {
+          const response = await fetch(formData.imageUrl);
+          const blob = await response.blob();
+          const fileExtension = formData.imageUrl.split('.').pop().toLowerCase();
+          
+          // Convertir blob a base64
+          const reader = new FileReader();
+          imageBase64 = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        // Asegurarse de que los datos estén en el formato correcto
+        const formattedRecipeData = {
+          ...recipeData,
+          userId: userId,
+          prepTime: parseInt(recipeData.prepTime),
+          cookTime: parseInt(recipeData.cookTime),
+          servings: parseInt(recipeData.servings),
+          image: imageBase64 ? {
+            data: imageBase64,
+            extension: formData.imageUrl.split('.').pop().toLowerCase()
+          } : null,
+          ingredients: recipeData.ingredients.map(ing => ({
+            name: ing.name,
+            amount: parseFloat(ing.amount),
+            unit: ing.unit,
+            isOptional: ing.isOptional || false
+          })),
+          steps: recipeData.steps.map(step => ({
+            text: step.text,
+            photo: step.photo ? {
+              url: step.photo.url,
+              extension: step.photo.extension
+            } : null
+          }))
+        };
+
+        console.log('Intentando subir receta con datos formateados:', JSON.stringify(formattedRecipeData, null, 2));
+        
+        const response = await fetch(`${HOST_URL}/api/recipes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(formattedRecipeData),
+        });
+
+        console.log('Respuesta del servidor:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+
+        if (!response.ok) {
+          let errorMessage = '';
+          try {
+            const errorData = await response.json();
+            console.error('Error detallado del servidor (JSON):', errorData);
+            
+            // Si es un error de receta duplicada
+            if (response.status === 409 && errorData.existingRecipeId) {
+              Alert.alert(
+                'Receta duplicada',
+                errorData.message,
+                [
+                  {
+                    text: 'Reemplazar',
+                    onPress: async () => {
+                      try {
+                        const replaceResponse = await fetch(`${HOST_URL}/api/recipes/${errorData.existingRecipeId}`, {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                          },
+                          body: JSON.stringify(formattedRecipeData),
+                        });
+
+                        if (!replaceResponse.ok) {
+                          throw new Error('Error al reemplazar la receta');
+                        }
+
+                        Alert.alert('Éxito', 'Receta reemplazada correctamente');
+                        router.back();
+                      } catch (error) {
+                        Alert.alert('Error', 'No se pudo reemplazar la receta');
+                      }
+                    }
+                  },
+                  {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                    onPress: () => {
+                      // No hacer nada, el usuario cancela la operación
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+
+            errorMessage = errorData.message || errorData.error || 'Error desconocido';
+          } catch (e) {
+            const errorText = await response.text();
+            console.error('Error detallado del servidor (texto):', errorText);
+            errorMessage = errorText || 'Error desconocido';
+          }
+          throw new Error(`Error al crear la receta: ${response.status} ${response.statusText} - ${errorMessage}`);
+        }
+
+        const responseData = await response.json();
+        console.log('Respuesta exitosa:', responseData);
+
+        Alert.alert('Éxito', 'Receta creada correctamente');
+        router.back();
+      } catch (decodeError) {
+        console.error('Error al decodificar el token:', decodeError);
+        throw new Error('Error al procesar el token de autenticación');
       }
-
-      // Si hay conexión y no está cargando, subir directamente
-      await uploadRecipe(recipeData);
-
     } catch (error) {
-      console.error('Error creating recipe:', error);
-      Alert.alert('Error', 'No se pudo crear la receta. Por favor intente nuevamente.');
+      console.error('Error completo al subir la receta:', {
+        message: error.message,
+        stack: error.stack,
+        recipeData: JSON.stringify(recipeData, null, 2)
+      });
+      Alert.alert(
+        'Error',
+        'No se pudo subir la receta. Se guardará localmente y se intentará subir más tarde.',
+        [{ text: 'OK' }]
+      );
+      await savePendingRecipe(recipeData);
+      router.back();
     }
   };
 
