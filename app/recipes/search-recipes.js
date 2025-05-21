@@ -37,6 +37,9 @@ export default function SearchRecipes() {
   const [excludeIngredients, setExcludeIngredients] = useState([]);
   const [includeInput, setIncludeInput] = useState('');
   const [excludeInput, setExcludeInput] = useState('');
+  const [sortOption, setSortOption] = useState('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -58,6 +61,9 @@ export default function SearchRecipes() {
       if (excludeIngredients.length > 0) {
         params.append('excludeIngredients', excludeIngredients.join(','));
       }
+      params.append('sort', sortOption);
+      params.append('page', currentPage);
+      params.append('limit', 10); // Número de recetas por página
 
       const response = await fetch(`${HOST_URL}/api/recipes/search?${params.toString()}`);
 
@@ -68,6 +74,7 @@ export default function SearchRecipes() {
       const data = await response.json();
       if (data.success) {
         setRecipes(data.recipes);
+        setTotalPages(Math.ceil(data.pagination.total / data.pagination.limit));
       } else {
         throw new Error(data.message || 'Error al buscar recetas');
       }
@@ -107,6 +114,11 @@ export default function SearchRecipes() {
   const handleSearchAndClose = async () => {
     await handleSearch();
     setShowFilters(false);
+  };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    handleSearch();
   };
 
   const renderRecipeItem = ({ item }) => (
@@ -266,6 +278,60 @@ export default function SearchRecipes() {
                 ))}
               </View>
             </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterTitle}>Ordenar por</Text>
+              <View style={styles.sortOptionsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.sortOption,
+                    sortOption === 'newest' && styles.sortOptionSelected
+                  ]}
+                  onPress={() => setSortOption('newest')}
+                >
+                  <Text style={[
+                    styles.sortOptionText,
+                    sortOption === 'newest' && styles.sortOptionTextSelected
+                  ]}>Más recientes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sortOption,
+                    sortOption === 'oldest' && styles.sortOptionSelected
+                  ]}
+                  onPress={() => setSortOption('oldest')}
+                >
+                  <Text style={[
+                    styles.sortOptionText,
+                    sortOption === 'oldest' && styles.sortOptionTextSelected
+                  ]}>Más antiguos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sortOption,
+                    sortOption === 'name_asc' && styles.sortOptionSelected
+                  ]}
+                  onPress={() => setSortOption('name_asc')}
+                >
+                  <Text style={[
+                    styles.sortOptionText,
+                    sortOption === 'name_asc' && styles.sortOptionTextSelected
+                  ]}>A-Z</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.sortOption,
+                    sortOption === 'name_desc' && styles.sortOptionSelected
+                  ]}
+                  onPress={() => setSortOption('name_desc')}
+                >
+                  <Text style={[
+                    styles.sortOptionText,
+                    sortOption === 'name_desc' && styles.sortOptionTextSelected
+                  ]}>Z-A</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.searchButtonContainer}>
             <TouchableOpacity
@@ -284,17 +350,40 @@ export default function SearchRecipes() {
       ) : error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : (
-        <FlatList
-          data={recipes}
-          renderItem={renderRecipeItem}
-          keyExtractor={(item) => item.recipeId.toString()}
-          contentContainerStyle={styles.recipesList}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              No se encontraron recetas que coincidan con los criterios de búsqueda
-            </Text>
-          }
-        />
+        <>
+          <FlatList
+            data={recipes}
+            renderItem={renderRecipeItem}
+            keyExtractor={(item) => item.recipeId.toString()}
+            contentContainerStyle={styles.recipesList}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                No se encontraron recetas que coincidan con los criterios de búsqueda
+              </Text>
+            }
+          />
+          {totalPages > 1 && (
+            <View style={styles.paginationContainer}>
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                onPress={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <Ionicons name="chevron-back" size={24} color={currentPage === 1 ? colors.textSecondary : colors.primary} />
+              </TouchableOpacity>
+              <Text style={styles.paginationText}>
+                Página {currentPage} de {totalPages}
+              </Text>
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+                onPress={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <Ionicons name="chevron-forward" size={24} color={currentPage === totalPages ? colors.textSecondary : colors.primary} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -499,5 +588,43 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  sortOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  sortOption: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: colors.inputBackground,
+    borderRadius: 20,
+  },
+  sortOptionSelected: {
+    backgroundColor: colors.primary,
+  },
+  sortOptionText: {
+    color: colors.text,
+  },
+  sortOptionTextSelected: {
+    color: colors.white,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  paginationButton: {
+    padding: 10,
+  },
+  paginationButtonDisabled: {
+    opacity: 0.5,
+  },
+  paginationText: {
+    marginHorizontal: 15,
+    color: colors.text,
   },
 }); 
