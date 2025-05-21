@@ -1,18 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { HOST_URL } from '../config/config';
@@ -29,6 +30,22 @@ const UNITS = [
   { abbreviation: 'unit', name: 'Unidad' }
 ];
 
+// Agregar después de las constantes existentes
+const RECIPE_TYPES = [
+  { id: 1, name: 'Desayuno' },
+  { id: 2, name: 'Almuerzo' },
+  { id: 3, name: 'Cena' },
+  { id: 4, name: 'Postre' },
+  { id: 5, name: 'Aperitivo' },
+  { id: 6, name: 'Vegetariana' },
+  { id: 7, name: 'Vegana' },
+  { id: 8, name: 'Italiana' },
+  { id: 9, name: 'Mexicana' },
+  { id: 10, name: 'Asiática' },
+  { id: 11, name: 'Ensaladas' },
+  { id: 12, name: 'Sopas' }
+];
+
 export default function CreateRecipe() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -37,14 +54,14 @@ export default function CreateRecipe() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    instructions: '',
     prepTime: '',
     cookTime: '',
     servings: '',
     difficulty: 'medium',
     isPublic: false,
     imageUrl: null,
-    ingredients: [{ name: '', amount: '', unit: '' }]
+    ingredients: [{ name: '', amount: '', unit: '' }],
+    steps: [{ text: '', photo: null }]
   });
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -52,6 +69,8 @@ export default function CreateRecipe() {
   const [isDifficultyModalVisible, setIsDifficultyModalVisible] = useState(false);
   const [error, setError] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+  const [isTypeModalVisible, setIsTypeModalVisible] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -97,16 +116,14 @@ export default function CreateRecipe() {
     });
 
     if (!result.canceled) {
-      // Verificar el tamaño del archivo
       const response = await fetch(result.assets[0].uri);
       const blob = await response.blob();
       
-      if (blob.size > 5 * 1024 * 1024) { // 5MB
+      if (blob.size > 5 * 1024 * 1024) {
         Alert.alert('Error', 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
         return;
       }
 
-      // Verificar la extensión del archivo
       const fileExtension = result.assets[0].uri.split('.').pop().toLowerCase();
       if (!['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
         Alert.alert('Error', 'Solo se permiten archivos de imagen (jpg, jpeg, png, gif).');
@@ -252,10 +269,6 @@ export default function CreateRecipe() {
       newErrors.description = 'La descripción es requerida';
     }
 
-    if (!formData.instructions) {
-      newErrors.instructions = 'Las instrucciones son requeridas';
-    }
-
     if (!formData.prepTime) {
       newErrors.prepTime = 'El tiempo de preparación es requerido';
     } else if (isNaN(formData.prepTime) || formData.prepTime <= 0) {
@@ -299,9 +312,23 @@ export default function CreateRecipe() {
 
   const handleCreateRecipe = async () => {
     try {
+      setHasAttemptedSubmit(true);
       // Validar campos requeridos
-      if (!formData.title || !formData.description || !formData.instructions || !formData.prepTime || !formData.cookTime || !formData.servings || !formData.difficulty || !selectedType) {
-        Alert.alert('Error', 'Por favor complete todos los campos requeridos');
+      const missingFields = [];
+      
+      if (!formData.title) missingFields.push('Título');
+      if (!formData.description) missingFields.push('Descripción');
+      if (!formData.prepTime) missingFields.push('Tiempo de preparación');
+      if (!formData.cookTime) missingFields.push('Tiempo de cocción');
+      if (!formData.servings) missingFields.push('Porciones');
+      if (!formData.difficulty) missingFields.push('Dificultad');
+      if (!selectedType) missingFields.push('Tipo de receta');
+
+      if (missingFields.length > 0) {
+        Alert.alert(
+          'Campos requeridos',
+          `Por favor complete los siguientes campos:\n\n${missingFields.join('\n')}`
+        );
         return;
       }
 
@@ -311,10 +338,49 @@ export default function CreateRecipe() {
         return;
       }
 
+      // Validar que todos los ingredientes estén completos
+      const incompleteIngredients = formData.ingredients.map((ing, index) => {
+        const missing = [];
+        if (!ing.name) missing.push('nombre');
+        if (!ing.amount) missing.push('cantidad');
+        if (!ing.unit) missing.push('unidad');
+        return missing.length > 0 ? { index: index + 1, missing } : null;
+      }).filter(Boolean);
+
+      if (incompleteIngredients.length > 0) {
+        const message = incompleteIngredients.map(ing => 
+          `Ingrediente ${ing.index}: falta ${ing.missing.join(', ')}`
+        ).join('\n');
+        
+        Alert.alert(
+          'Ingredientes incompletos',
+          `Complete los siguientes campos:\n\n${message}`
+        );
+        return;
+      }
+
+      // Validar pasos
+      if (formData.steps.length === 0) {
+        Alert.alert('Error', 'Debe agregar al menos un paso');
+        return;
+      }
+
+      // Validar que todos los pasos tengan texto
+      const incompleteSteps = formData.steps.map((step, index) => 
+        !step.text ? index + 1 : null
+      ).filter(Boolean);
+
+      if (incompleteSteps.length > 0) {
+        Alert.alert(
+          'Pasos incompletos',
+          `Complete el texto de los siguientes pasos:\n\n${incompleteSteps.join(', ')}`
+        );
+        return;
+      }
+
       const recipeData = {
         title: formData.title,
         description: formData.description,
-        instructions: formData.instructions,
         prepTime: parseInt(formData.prepTime),
         cookTime: parseInt(formData.cookTime),
         servings: parseInt(formData.servings),
@@ -325,6 +391,10 @@ export default function CreateRecipe() {
           amount: parseFloat(ing.amount),
           unit: ing.unit,
           isOptional: ing.isOptional || false
+        })),
+        steps: formData.steps.map(step => ({
+          text: step.text,
+          photo: step.photo
         }))
       };
 
@@ -449,6 +519,131 @@ export default function CreateRecipe() {
     </TouchableOpacity>
   );
 
+  const addStep = () => {
+    setFormData(prev => ({
+      ...prev,
+      steps: [...prev.steps, { text: '', photo: null }]
+    }));
+  };
+
+  const removeStep = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      steps: prev.steps.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateStep = (index, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      steps: prev.steps.map((step, i) => 
+        i === index ? { ...step, [field]: value } : step
+      )
+    }));
+  };
+
+  const pickStepPhoto = async (index) => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permiso requerido', 'Por favor permita acceder a la galería para subir fotos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+      exif: false,
+    });
+
+    if (!result.canceled) {
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+      
+      if (blob.size > 5 * 1024 * 1024) {
+        Alert.alert('Error', 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
+        return;
+      }
+
+      const fileExtension = result.assets[0].uri.split('.').pop().toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        Alert.alert('Error', 'Solo se permiten archivos de imagen (jpg, jpeg, png, gif).');
+        return;
+      }
+
+      updateStep(index, 'photo', {
+        extension: fileExtension,
+        url: result.assets[0].uri
+      });
+    }
+  };
+
+  const removeStepPhoto = (index) => {
+    updateStep(index, 'photo', null);
+  };
+
+  const showTypePicker = () => {
+    setIsTypeModalVisible(true);
+  };
+
+  const handleTypeSelect = (type) => {
+    setSelectedType(type.id);
+    setIsTypeModalVisible(false);
+  };
+
+  const getTypeName = (typeId) => {
+    const type = RECIPE_TYPES.find(t => t.id === typeId);
+    return type ? type.name : 'Seleccionar tipo';
+  };
+
+  const renderTypeItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.typeItem}
+      onPress={() => handleTypeSelect(item)}
+    >
+      <View style={styles.radioContainer}>
+        <View style={[
+          styles.radio,
+          selectedType === item.id && styles.radioSelected
+        ]}>
+          {selectedType === item.id && (
+            <View style={styles.radioInner} />
+          )}
+        </View>
+        <Text style={styles.typeItemText}>{item.name}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const getInputStyle = (field) => {
+    if (!hasAttemptedSubmit) return styles.input;
+    return [
+      styles.input,
+      !formData[field] && styles.inputError
+    ];
+  };
+
+  const getPickerStyle = (field) => {
+    if (!hasAttemptedSubmit) return [styles.input, styles.picker];
+    return [
+      styles.input,
+      styles.picker,
+      !formData[field] && styles.inputError
+    ];
+  };
+
+  const getTypePickerStyle = () => {
+    if (!hasAttemptedSubmit) return [styles.input, styles.picker];
+    return [
+      styles.input,
+      styles.picker,
+      !selectedType && styles.inputError
+    ];
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Crear Nueva Receta</Text>
@@ -457,7 +652,7 @@ export default function CreateRecipe() {
         <Text style={styles.sectionTitle}>Información Básica</Text>
         
         <TextInput
-          style={[styles.input, errors.title && styles.inputError]}
+          style={getInputStyle('title')}
           placeholder="Título de la receta"
           value={formData.title}
           onChangeText={(text) => {
@@ -465,10 +660,10 @@ export default function CreateRecipe() {
             setErrors(prev => ({ ...prev, title: '' }));
           }}
         />
-        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+        {hasAttemptedSubmit && !formData.title && <Text style={styles.errorText}>El título es requerido</Text>}
 
         <TextInput
-          style={[styles.input, styles.textArea, errors.description && styles.inputError]}
+          style={getInputStyle('description')}
           placeholder="Descripción"
           value={formData.description}
           onChangeText={(text) => {
@@ -478,12 +673,12 @@ export default function CreateRecipe() {
           multiline
           numberOfLines={4}
         />
-        {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+        {hasAttemptedSubmit && !formData.description && <Text style={styles.errorText}>La descripción es requerida</Text>}
 
         <View style={styles.row}>
           <View style={styles.halfInput}>
             <TextInput
-              style={[styles.input, errors.prepTime && styles.inputError]}
+              style={getInputStyle('prepTime')}
               placeholder="Tiempo Prep (min)"
               value={formData.prepTime}
               onChangeText={(text) => {
@@ -492,12 +687,12 @@ export default function CreateRecipe() {
               }}
               keyboardType="numeric"
             />
-            {errors.prepTime && <Text style={styles.errorText}>{errors.prepTime}</Text>}
+            {hasAttemptedSubmit && !formData.prepTime && <Text style={styles.errorText}>El tiempo de preparación es requerido</Text>}
           </View>
 
           <View style={styles.halfInput}>
             <TextInput
-              style={[styles.input, errors.cookTime && styles.inputError]}
+              style={getInputStyle('cookTime')}
               placeholder="Tiempo cocción (min)"
               value={formData.cookTime}
               onChangeText={(text) => {
@@ -506,14 +701,14 @@ export default function CreateRecipe() {
               }}
               keyboardType="numeric"
             />
-            {errors.cookTime && <Text style={styles.errorText}>{errors.cookTime}</Text>}
+            {hasAttemptedSubmit && !formData.cookTime && <Text style={styles.errorText}>El tiempo de cocción es requerido</Text>}
           </View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.halfInput}>
             <TextInput
-              style={[styles.input, errors.servings && styles.inputError]}
+              style={getInputStyle('servings')}
               placeholder="Porciones"
               value={formData.servings}
               onChangeText={(text) => {
@@ -522,20 +717,31 @@ export default function CreateRecipe() {
               }}
               keyboardType="numeric"
             />
-            {errors.servings && <Text style={styles.errorText}>{errors.servings}</Text>}
+            {hasAttemptedSubmit && !formData.servings && <Text style={styles.errorText}>El número de porciones es requerido</Text>}
           </View>
 
           <View style={styles.halfInput}>
             <TouchableOpacity
-              style={[styles.input, styles.picker, errors.difficulty && styles.inputError]}
+              style={getPickerStyle('difficulty')}
               onPress={showDifficultyPicker}
             >
               <Text style={styles.pickerText}>
                 {getDifficultyName(formData.difficulty)}
               </Text>
             </TouchableOpacity>
+            {hasAttemptedSubmit && !formData.difficulty && <Text style={styles.errorText}>La dificultad es requerida</Text>}
           </View>
         </View>
+
+        <TouchableOpacity
+          style={getTypePickerStyle()}
+          onPress={showTypePicker}
+        >
+          <Text style={styles.pickerText}>
+            {getTypeName(selectedType)}
+          </Text>
+        </TouchableOpacity>
+        {hasAttemptedSubmit && !selectedType && <Text style={styles.errorText}>El tipo de receta es requerido</Text>}
       </View>
 
       <View style={styles.section}>
@@ -597,19 +803,58 @@ export default function CreateRecipe() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Instrucciones</Text>
-        <TextInput
-          style={[styles.input, styles.textArea, errors.instructions && styles.inputError]}
-          placeholder="Describe los pasos a seguir..."
-          value={formData.instructions}
-          onChangeText={(text) => {
-            setFormData(prev => ({ ...prev, instructions: text }));
-            setErrors(prev => ({ ...prev, instructions: '' }));
-          }}
-          multiline
-          numberOfLines={6}
-        />
-        {errors.instructions && <Text style={styles.errorText}>{errors.instructions}</Text>}
+        <Text style={styles.sectionTitle}>Pasos de la Receta</Text>
+        {formData.steps.map((step, index) => (
+          <View key={index} style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepNumber}>Paso {index + 1}</Text>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeStep(index)}
+              >
+                <Text style={styles.removeButtonText}>X</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TextInput
+              style={[styles.input, styles.textArea, errors[`step_${index}`] && styles.inputError]}
+              placeholder="Describe este paso..."
+              value={step.text}
+              onChangeText={(text) => updateStep(index, 'text', text)}
+              multiline
+              numberOfLines={3}
+            />
+            {errors[`step_${index}`] && <Text style={styles.errorText}>{errors[`step_${index}`]}</Text>}
+
+            <View style={styles.stepPhotoContainer}>
+              {step.photo ? (
+                <View style={styles.stepPhotoPreview}>
+                  <Image source={{ uri: step.photo.url }} style={styles.stepPhoto} />
+                  <TouchableOpacity
+                    style={styles.removePhotoButton}
+                    onPress={() => removeStepPhoto(index)}
+                  >
+                    <Ionicons name="close-circle" size={24} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.addPhotoButton}
+                  onPress={() => pickStepPhoto(index)}
+                >
+                  <Ionicons name="camera" size={24} color={colors.primary} />
+                  <Text style={styles.addPhotoText}>Agregar foto</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        ))}
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={addStep}
+        >
+          <Text style={styles.addButtonText}>+ Agregar Paso</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -661,6 +906,30 @@ export default function CreateRecipe() {
           <TouchableOpacity
             style={styles.modalCloseButton}
             onPress={() => setIsDifficultyModalVisible(false)}
+          >
+            <Text style={styles.modalCloseButtonText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal
+        isVisible={isTypeModalVisible}
+        onBackdropPress={() => setIsTypeModalVisible(false)}
+        onBackButtonPress={() => setIsTypeModalVisible(false)}
+        style={styles.modal}
+        backdropOpacity={0.5}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Seleccionar Tipo de Receta</Text>
+          <FlatList
+            data={RECIPE_TYPES}
+            renderItem={renderTypeItem}
+            keyExtractor={(item) => item.id.toString()}
+            style={styles.typeList}
+          />
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setIsTypeModalVisible(false)}
           >
             <Text style={styles.modalCloseButtonText}>Cancelar</Text>
           </TouchableOpacity>
@@ -909,5 +1178,66 @@ const styles = StyleSheet.create({
   },
   difficultyList: {
     maxHeight: 200,
+  },
+  stepContainer: {
+    marginBottom: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 10,
+    padding: 15,
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  stepNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  stepPhotoContainer: {
+    marginTop: 10,
+  },
+  stepPhotoPreview: {
+    position: 'relative',
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  stepPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+  },
+  addPhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.inputBackground,
+    padding: 15,
+    borderRadius: 10,
+    gap: 10,
+  },
+  addPhotoText: {
+    color: colors.primary,
+    fontSize: 16,
+  },
+  typeList: {
+    maxHeight: 400,
+  },
+  typeItem: {
+    padding: 5,
+  },
+  typeItemText: {
+    fontSize: 16,
+    color: colors.text,
   },
 }); 
