@@ -1,17 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { HOST_URL } from '../config/config';
@@ -50,6 +51,7 @@ export default function CreateRecipe() {
   const [activeUnitIndex, setActiveUnitIndex] = useState(null);
   const [isDifficultyModalVisible, setIsDifficultyModalVisible] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
 
   useEffect(() => {
     checkAuth();
@@ -295,150 +297,124 @@ export default function CreateRecipe() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleCreateRecipe = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
       // Validar campos requeridos
-      if (!formData.title || !formData.description || !formData.instructions || !formData.prepTime || !formData.cookTime || !formData.servings || !formData.difficulty) {
-        setError('Por favor complete todos los campos requeridos');
-        setLoading(false);
+      if (!formData.title || !formData.description || !formData.instructions || !formData.prepTime || !formData.cookTime || !formData.servings || !formData.difficulty || !selectedType) {
+        Alert.alert('Error', 'Por favor complete todos los campos requeridos');
         return;
       }
 
       // Validar ingredientes
       if (formData.ingredients.length === 0) {
-        setError('Debe agregar al menos un ingrediente');
-        setLoading(false);
+        Alert.alert('Error', 'Debe agregar al menos un ingrediente');
         return;
       }
 
-      // Validar imagen
-      if (!formData.imageUrl) {
-        setError('Debe seleccionar una imagen');
-        setLoading(false);
-        return;
-      }
+      const recipeData = {
+        title: formData.title,
+        description: formData.description,
+        instructions: formData.instructions,
+        prepTime: parseInt(formData.prepTime),
+        cookTime: parseInt(formData.cookTime),
+        servings: parseInt(formData.servings),
+        difficulty: formData.difficulty,
+        typeId: selectedType,
+        ingredients: formData.ingredients.map(ing => ({
+          name: ing.name,
+          amount: parseFloat(ing.amount),
+          unit: ing.unit,
+          isOptional: ing.isOptional || false
+        }))
+      };
 
-      const submitData = new FormData();
-      const userId = await AsyncStorage.getItem('userId');
-      if (!userId) {
-        setError('Error: Usuario no encontrado. Por favor, inicie sesión nuevamente.');
-        setLoading(false);
-        return;
-      }
-      submitData.append('userId', userId);
-      submitData.append('title', formData.title);
-      submitData.append('description', formData.description);
-      submitData.append('instructions', formData.instructions);
-      submitData.append('prepTime', formData.prepTime);
-      submitData.append('cookTime', formData.cookTime);
-      submitData.append('servings', formData.servings);
-      submitData.append('difficulty', formData.difficulty);
-      submitData.append('isPublic', formData.isPublic.toString());
-      submitData.append('ingredients', JSON.stringify(formData.ingredients));
-      submitData.append('imageUrl', {
-        uri: formData.imageUrl,
-        type: 'image/jpeg',
-        name: 'recipe-image.jpg'
-      });
+      // Verificar estado de la red
+      const netInfo = await NetInfo.fetch();
+      const isConnected = netInfo.isConnected;
+      const isCharging = netInfo.details?.isCharging || false;
 
-      const token = await AsyncStorage.getItem('authToken');
-
-      const response = await fetch(`${HOST_URL}/api/recipes`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-        body: submitData
-      });
-
-      const data = await response.json();
-
-      if (response.status === 409) {
-        // Receta existente encontrada
+      if (!isConnected) {
         Alert.alert(
-          'Receta existente',
-          'Ya existe una receta con este nombre. ¿Qué desea hacer?',
+          'Sin conexión',
+          'No hay conexión a internet. La receta se guardará localmente y se subirá cuando haya conexión.',
+          [{ text: 'OK' }]
+        );
+        await savePendingRecipe(recipeData);
+        router.back();
+        return;
+      }
+
+      if (isCharging) {
+        Alert.alert(
+          'Conexión con cargo',
+          'Estás usando una red con cargo. ¿Deseas continuar con la carga de la receta?',
           [
             {
-              text: 'Reemplazar',
-              onPress: () => handleRecipeAction('replace', submitData)
-            },
-            {
-              text: 'Editar',
-              onPress: () => handleRecipeAction('edit', submitData)
-            },
-            {
               text: 'Cancelar',
-              style: 'cancel'
-            }
+              style: 'cancel',
+            },
+            {
+              text: 'Guardar localmente',
+              onPress: async () => {
+                await savePendingRecipe(recipeData);
+                Alert.alert(
+                  'Receta guardada',
+                  'La receta se guardará localmente y se subirá cuando haya una conexión sin cargo.'
+                );
+                router.back();
+              },
+            },
+            {
+              text: 'Continuar',
+              onPress: async () => {
+                await uploadRecipe(recipeData);
+              },
+            },
           ]
         );
-        setLoading(false);
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al crear la receta');
-      }
-
-      Alert.alert(
-        'Éxito',
-        'Receta creada exitosamente',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/recipes/my-recipes')
-          }
-        ]
-      );
+      // Si hay conexión y no está cargando, subir directamente
+      await uploadRecipe(recipeData);
 
     } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
+      console.error('Error creating recipe:', error);
+      Alert.alert('Error', 'No se pudo crear la receta. Por favor intente nuevamente.');
     }
   };
 
-  const handleRecipeAction = async (action, submitData) => {
+  const uploadRecipe = async (recipeData) => {
     try {
-      setLoading(true);
-      submitData.append('action', action);
-
-      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${HOST_URL}/api/recipes`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
         },
-        body: submitData
+        body: JSON.stringify(recipeData),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message || `Error al ${action === 'replace' ? 'reemplazar' : 'editar'} la receta`);
+        throw new Error('Error al crear la receta');
       }
 
-      Alert.alert(
-        'Éxito',
-        `Receta ${action === 'replace' ? 'reemplazada' : 'editada'} exitosamente`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/recipes/my-recipes')
-          }
-        ]
-      );
-
+      Alert.alert('Éxito', 'Receta creada correctamente');
+      router.back();
     } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', 'No se pudo crear la receta. Se guardará localmente.');
+      await savePendingRecipe(recipeData);
+      router.back();
+    }
+  };
+
+  const savePendingRecipe = async (recipe) => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem('pendingRecipes');
+      const pendingRecipes = storedRecipes ? JSON.parse(storedRecipes) : [];
+      pendingRecipes.push(recipe);
+      await AsyncStorage.setItem('pendingRecipes', JSON.stringify(pendingRecipes));
+    } catch (error) {
+      console.error('Error saving pending recipe:', error);
     }
   };
 
@@ -637,13 +613,10 @@ export default function CreateRecipe() {
       </View>
 
       <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
+        style={styles.createButton}
+        onPress={handleCreateRecipe}
       >
-        <Text style={styles.buttonText}>
-          {loading ? 'Creando...' : 'Crear Receta'}
-        </Text>
+        <Text style={styles.createButtonText}>Crear Receta</Text>
       </TouchableOpacity>
 
       <Modal
@@ -815,17 +788,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: 'bold',
   },
-  button: {
+  createButton: {
     backgroundColor: colors.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 30,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
+  createButtonText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',

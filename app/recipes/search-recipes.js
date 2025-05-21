@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  NetInfo,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -44,6 +47,173 @@ export default function SearchRecipes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isCharging, setIsCharging] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const [pendingRecipes, setPendingRecipes] = useState([]);
+
+  useEffect(() => {
+    // Verificar estado de la red y carga
+    const checkNetworkAndCharging = async () => {
+      try {
+        const netInfo = await NetInfo.fetch();
+        setIsConnected(netInfo.isConnected);
+        setIsCharging(netInfo.details?.isCharging || false);
+
+        // Si hay conexión y no está cargando, intentar subir recetas pendientes
+        if (netInfo.isConnected && !netInfo.details?.isCharging) {
+          await uploadPendingRecipes();
+        }
+      } catch (error) {
+        console.error('Error checking network status:', error);
+      }
+    };
+
+    // Verificar estado inicial
+    checkNetworkAndCharging();
+
+    // Suscribirse a cambios en la red
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+      setIsCharging(state.details?.isCharging || false);
+      
+      // Si hay conexión y no está cargando, intentar subir recetas pendientes
+      if (state.isConnected && !state.details?.isCharging) {
+        uploadPendingRecipes();
+      }
+    });
+
+    // Cargar recetas pendientes al iniciar
+    loadPendingRecipes();
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const loadPendingRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem('pendingRecipes');
+      if (storedRecipes) {
+        setPendingRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error('Error loading pending recipes:', error);
+    }
+  };
+
+  const savePendingRecipe = async (recipe) => {
+    try {
+      const updatedPendingRecipes = [...pendingRecipes, recipe];
+      await AsyncStorage.setItem('pendingRecipes', JSON.stringify(updatedPendingRecipes));
+      setPendingRecipes(updatedPendingRecipes);
+    } catch (error) {
+      console.error('Error saving pending recipe:', error);
+    }
+  };
+
+  const uploadPendingRecipes = async () => {
+    if (pendingRecipes.length === 0) return;
+
+    try {
+      for (const recipe of pendingRecipes) {
+        const response = await fetch(`${HOST_URL}/api/recipes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(recipe),
+        });
+
+        if (response.ok) {
+          // Eliminar la receta pendiente después de subirla exitosamente
+          const updatedPendingRecipes = pendingRecipes.filter(r => r !== recipe);
+          await AsyncStorage.setItem('pendingRecipes', JSON.stringify(updatedPendingRecipes));
+          setPendingRecipes(updatedPendingRecipes);
+        }
+      }
+    } catch (error) {
+      console.error('Error uploading pending recipes:', error);
+    }
+  };
+
+  const handleCreateRecipe = async (recipeData) => {
+    if (!isConnected) {
+      Alert.alert(
+        'Sin conexión',
+        'No hay conexión a internet. La receta se guardará localmente y se subirá cuando haya conexión.',
+        [{ text: 'OK' }]
+      );
+      await savePendingRecipe(recipeData);
+      return;
+    }
+
+    if (isCharging) {
+      Alert.alert(
+        'Conexión con cargo',
+        'Estás usando una red con cargo. ¿Deseas continuar con la carga de la receta?',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+          {
+            text: 'Guardar localmente',
+            onPress: async () => {
+              await savePendingRecipe(recipeData);
+              Alert.alert(
+                'Receta guardada',
+                'La receta se guardará localmente y se subirá cuando haya una conexión sin cargo.'
+              );
+            },
+          },
+          {
+            text: 'Continuar',
+            onPress: async () => {
+              try {
+                const response = await fetch(`${HOST_URL}/api/recipes`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(recipeData),
+                });
+
+                if (!response.ok) {
+                  throw new Error('Error al crear la receta');
+                }
+
+                Alert.alert('Éxito', 'Receta creada correctamente');
+              } catch (error) {
+                Alert.alert('Error', 'No se pudo crear la receta. Se guardará localmente.');
+                await savePendingRecipe(recipeData);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Si hay conexión y no está cargando, subir directamente
+    try {
+      const response = await fetch(`${HOST_URL}/api/recipes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(recipeData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al crear la receta');
+      }
+
+      Alert.alert('Éxito', 'Receta creada correctamente');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo crear la receta. Se guardará localmente.');
+      await savePendingRecipe(recipeData);
+    }
+  };
 
   const handleSearch = async () => {
     try {
