@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -75,7 +76,7 @@ export default function HomeScreen() {
         
         <View style={styles.buttonContainer}>
           {!isAuthenticated ? (
-            <>
+            <View style={styles.buttonRow}>
               <TouchableOpacity 
                 style={styles.button}
                 onPress={() => router.push('/auth/login')}
@@ -88,35 +89,52 @@ export default function HomeScreen() {
               >
                 <Text style={styles.buttonText}>Create Account</Text>
               </TouchableOpacity>
-            </>
+            </View>
           ) : (
             <>
-              <TouchableOpacity 
-                style={[styles.button, styles.createButton]}
-                onPress={() => router.push('/recipes/create-recipe')}
-              >
-                <Text style={[styles.buttonText, styles.createButtonText]}>Crear Receta</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.button, styles.myRecipesButton]}
-                onPress={() => router.push('/recipes/my-recipes')}
-              >
-                <Text style={[styles.buttonText, styles.myRecipesButtonText]}>Mis Recetas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.button, styles.logoutButton]}
-                onPress={handleLogout}
-              >
-                <Text style={[styles.buttonText, styles.logoutButtonText]}>Cerrar Sesión</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => router.push('/recipes/create-recipe')}
+                >
+                  <Ionicons name="add-circle-outline" size={24} color={colors.white} />
+                  <Text style={styles.buttonText}>Crear Receta</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.button, styles.myRecipesButton]}
+                  onPress={() => router.push('/recipes/my-recipes')}
+                >
+                  <Ionicons name="book-outline" size={24} color={colors.white} />
+                  <Text style={styles.buttonText}>Mis Recetas</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.button, styles.logoutButton]}
+                  onPress={handleLogout}
+                >
+                  <Ionicons name="log-out-outline" size={24} color={colors.white} />
+                  <Text style={styles.buttonText}>Cerrar Sesión</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.button, styles.searchButton]}
+                  onPress={() => router.push('/recipes/search-recipes')}
+                >
+                  <Ionicons name="search-outline" size={24} color={colors.white} />
+                  <Text style={styles.buttonText}>Buscar Recetas</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={() => router.push('/auth/upgrade-to-student')}
-          >
-            <Text style={styles.buttonText}>Upgrade to Student</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={[styles.button, styles.upgradeButton]}
+              onPress={() => router.push('/auth/upgrade-to-student')}
+            >
+              <Ionicons name="school-outline" size={24} color={colors.white} />
+              <Text style={styles.buttonText}>Upgrade to Student</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       
@@ -147,31 +165,37 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   buttonContainer: {
+    padding: 20,
+    gap: 15,
+  },
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
+    gap: 10,
   },
   button: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
     flex: 1,
-    marginRight: 4,
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  searchButton: {
+    backgroundColor: colors.primary,
+  },
+  upgradeButton: {
+    backgroundColor: colors.primary,
   },
   buttonText: {
-    color: colors.primary,
+    color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
   },
   logoutButton: {
     backgroundColor: colors.error,
-    borderColor: colors.error,
-  },
-  logoutButtonText: {
-    color: colors.white,
   },
   welcomeText: {
     fontSize: 16,
@@ -224,18 +248,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  createButton: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  createButtonText: {
-    color: colors.white,
-  },
   myRecipesButton: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  myRecipesButtonText: {
-    color: colors.white,
   },
 }); 
