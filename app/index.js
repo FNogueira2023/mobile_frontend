@@ -126,6 +126,12 @@ export default function HomePage() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Últimas Recetas</Text>
+          <TouchableOpacity 
+            style={styles.createButton}
+            onPress={handleCreateRecipe}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {recipes.map((recipe) => (
@@ -181,7 +187,10 @@ export default function HomePage() {
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/recipes/search-recipes')}
+        >
           <Ionicons name="search" size={24} color={colors.textSecondary} />
           <Text style={styles.navText}>Buscar</Text>
         </TouchableOpacity>
@@ -196,7 +205,10 @@ export default function HomePage() {
           <Text style={styles.navText}>Cursos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/user')}
+        >
           <Ionicons name="person" size={24} color={colors.textSecondary} />
           <Text style={styles.navText}>Usuario</Text>
         </TouchableOpacity>
@@ -250,6 +262,9 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  createButton: {
+    padding: 8,
   },
   recipeCard: {
     backgroundColor: colors.cardBackground,

@@ -95,6 +95,8 @@ export default function Login() {
 
         await AsyncStorage.setItem('authToken', data.token);
         await AsyncStorage.setItem('userId', data.user.userId.toString());
+        // Guardar los datos completos del usuario
+        await AsyncStorage.setItem('userData', JSON.stringify(data.user));
         console.log('Datos guardados exitosamente');
 
         // Navigate to main app

@@ -4,15 +4,15 @@ import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -319,6 +319,15 @@ export default function SearchRecipes() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Buscar Recetas</Text>
+        <TouchableOpacity 
+          style={styles.createButton}
+          onPress={() => router.push('/recipes/create-recipe')}
+        >
+          <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -563,6 +572,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  createButton: {
+    padding: 8,
   },
   searchContainer: {
     flexDirection: 'row',
