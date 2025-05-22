@@ -311,100 +311,94 @@ export default function CreateRecipe() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Función para generar nombres únicos de archivo
+  const generateUniqueFileName = (prefix, extension) => {
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1E9);
+    return `${prefix}-${timestamp}-${randomSuffix}.${extension}`;
+  };
+
+  // Función para validar y procesar una imagen
+  const processImage = async (uri) => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      if (blob.size > 5 * 1024 * 1024) {
+        throw new Error('La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
+      }
+
+      const fileExtension = uri.split('.').pop().toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        throw new Error('Solo se permiten archivos de imagen (jpg, jpeg, png, gif).');
+      }
+
+      return {
+        blob,
+        extension: fileExtension,
+        mimeType: `image/${fileExtension}`
+      };
+    } catch (error) {
+      console.error('Error procesando imagen:', error);
+      throw error;
+    }
+  };
+
+  const pickStepPhoto = async (index) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        throw new Error('Se requiere permiso para acceder a la galería');
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+        exif: false,
+      });
+
+      if (!result.canceled) {
+        const { blob, extension, mimeType } = await processImage(result.assets[0].uri);
+        const fileName = generateUniqueFileName('step', extension);
+
+        // Actualizar el paso con la información de la imagen
+        updateStep(index, 'photo', {
+          uri: result.assets[0].uri,
+          name: fileName,
+          type: mimeType,
+          extension: extension,
+          photoIndex: index
+        });
+
+        console.log(`Imagen de paso ${index + 1} procesada:`, {
+          fileName,
+          type: mimeType,
+          size: blob.size,
+          photoIndex: index
+        });
+      }
+    } catch (error) {
+      console.error(`Error al seleccionar imagen para paso ${index + 1}:`, error);
+      Alert.alert('Error', error.message || 'No se pudo procesar la imagen');
+    }
+  };
+
   const handleCreateRecipe = async () => {
     try {
       setHasAttemptedSubmit(true);
-      // Validar campos requeridos
-      const missingFields = [];
       
-      if (!formData.title) missingFields.push('Título');
-      if (!formData.description) missingFields.push('Descripción');
-      if (!formData.prepTime) missingFields.push('Tiempo de preparación');
-      if (!formData.cookTime) missingFields.push('Tiempo de cocción');
-      if (!formData.servings) missingFields.push('Porciones');
-      if (!formData.difficulty) missingFields.push('Dificultad');
-      if (!selectedType) missingFields.push('Tipo de receta');
-
-      if (missingFields.length > 0) {
-        Alert.alert(
-          'Campos requeridos',
-          `Por favor complete los siguientes campos:\n\n${missingFields.join('\n')}`
-        );
+      // Validaciones existentes...
+      if (!validateForm()) {
         return;
       }
-
-      // Validar ingredientes
-      if (formData.ingredients.length === 0) {
-        Alert.alert('Error', 'Debe agregar al menos un ingrediente');
-        return;
-      }
-
-      // Validar que todos los ingredientes estén completos
-      const incompleteIngredients = formData.ingredients.map((ing, index) => {
-        const missing = [];
-        if (!ing.name) missing.push('nombre');
-        if (!ing.amount) missing.push('cantidad');
-        if (!ing.unit) missing.push('unidad');
-        return missing.length > 0 ? { index: index + 1, missing } : null;
-      }).filter(Boolean);
-
-      if (incompleteIngredients.length > 0) {
-        const message = incompleteIngredients.map(ing => 
-          `Ingrediente ${ing.index}: falta ${ing.missing.join(', ')}`
-        ).join('\n');
-        
-        Alert.alert(
-          'Ingredientes incompletos',
-          `Complete los siguientes campos:\n\n${message}`
-        );
-        return;
-      }
-
-      // Validar pasos
-      if (formData.steps.length === 0) {
-        Alert.alert('Error', 'Debe agregar al menos un paso');
-        return;
-      }
-
-      // Validar que todos los pasos tengan texto
-      const incompleteSteps = formData.steps.map((step, index) => 
-        !step.text ? index + 1 : null
-      ).filter(Boolean);
-
-      if (incompleteSteps.length > 0) {
-        Alert.alert(
-          'Pasos incompletos',
-          `Complete el texto de los siguientes pasos:\n\n${incompleteSteps.join(', ')}`
-        );
-        return;
-      }
-
-      const recipeData = {
-        title: formData.title,
-        description: formData.description,
-        prepTime: parseInt(formData.prepTime),
-        cookTime: parseInt(formData.cookTime),
-        servings: parseInt(formData.servings),
-        difficulty: formData.difficulty,
-        typeId: selectedType,
-        ingredients: formData.ingredients.map(ing => ({
-          name: ing.name,
-          amount: parseFloat(ing.amount),
-          unit: ing.unit,
-          isOptional: ing.isOptional || false
-        })),
-        steps: formData.steps.map(step => ({
-          text: step.text,
-          photo: step.photo
-        }))
-      };
 
       // Verificar estado de la red
       const netInfo = await NetInfo.fetch();
-      const isConnected = netInfo.isConnected;
-      const isCharging = netInfo.details?.isCharging || false;
-
-      if (!isConnected) {
+      if (!netInfo.isConnected) {
         Alert.alert(
           'Sin conexión',
           'No hay conexión a internet. La receta se guardará localmente y se subirá cuando haya conexión.',
@@ -415,164 +409,137 @@ export default function CreateRecipe() {
         return;
       }
 
-      // Si hay conexión, intentar subir directamente
-      try {
-        const token = await AsyncStorage.getItem('authToken');
-        if (!token) {
-          throw new Error('No hay token de autenticación');
-        }
-
-        // Decodificar el token usando jwt-decode
-        const decodedToken = jwtDecode(token);
-        console.log('Token decodificado:', decodedToken);
-
-        // Intentar obtener el userId de diferentes campos posibles
-        const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
-        
-        if (!userId) {
-          console.error('Token decodificado no contiene userId:', decodedToken);
-          throw new Error('No se pudo obtener el ID del usuario del token');
-        }
-
-        // Preparar la imagen para enviar
-        let imageBase64 = null;
-        if (formData.imageUrl) {
-          const response = await fetch(formData.imageUrl);
-          const blob = await response.blob();
-          const fileExtension = formData.imageUrl.split('.').pop().toLowerCase();
-          
-          // Convertir blob a base64
-          const reader = new FileReader();
-          imageBase64 = await new Promise((resolve, reject) => {
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        }
-
-        // Asegurarse de que los datos estén en el formato correcto
-        const formattedRecipeData = {
-          ...recipeData,
-          userId: userId,
-          prepTime: parseInt(recipeData.prepTime),
-          cookTime: parseInt(recipeData.cookTime),
-          servings: parseInt(recipeData.servings),
-          image: imageBase64 ? {
-            data: imageBase64,
-            extension: formData.imageUrl.split('.').pop().toLowerCase()
-          } : null,
-          ingredients: recipeData.ingredients.map(ing => ({
-            name: ing.name,
-            amount: parseFloat(ing.amount),
-            unit: ing.unit,
-            isOptional: ing.isOptional || false
-          })),
-          steps: recipeData.steps.map(step => ({
-            text: step.text,
-            photo: step.photo ? {
-              url: step.photo.url,
-              extension: step.photo.extension
-            } : null
-          }))
-        };
-
-        console.log('Intentando subir receta con datos formateados:', JSON.stringify(formattedRecipeData, null, 2));
-        
-        const response = await fetch(`${HOST_URL}/api/recipes`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(formattedRecipeData),
-        });
-
-        console.log('Respuesta del servidor:', {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok,
-          headers: Object.fromEntries(response.headers.entries())
-        });
-
-        if (!response.ok) {
-          let errorMessage = '';
-          try {
-            const errorData = await response.json();
-            console.error('Error detallado del servidor (JSON):', errorData);
-            
-            // Si es un error de receta duplicada
-            if (response.status === 409 && errorData.existingRecipeId) {
-              Alert.alert(
-                'Receta duplicada',
-                errorData.message,
-                [
-                  {
-                    text: 'Reemplazar',
-                    onPress: async () => {
-                      try {
-                        const replaceResponse = await fetch(`${HOST_URL}/api/recipes/${errorData.existingRecipeId}`, {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                          },
-                          body: JSON.stringify(formattedRecipeData),
-                        });
-
-                        if (!replaceResponse.ok) {
-                          throw new Error('Error al reemplazar la receta');
-                        }
-
-                        Alert.alert('Éxito', 'Receta reemplazada correctamente');
-                        router.back();
-                      } catch (error) {
-                        Alert.alert('Error', 'No se pudo reemplazar la receta');
-                      }
-                    }
-                  },
-                  {
-                    text: 'Cancelar',
-                    style: 'cancel',
-                    onPress: () => {
-                      // No hacer nada, el usuario cancela la operación
-                    }
-                  }
-                ]
-              );
-              return;
-            }
-
-            errorMessage = errorData.message || errorData.error || 'Error desconocido';
-          } catch (e) {
-            const errorText = await response.text();
-            console.error('Error detallado del servidor (texto):', errorText);
-            errorMessage = errorText || 'Error desconocido';
-          }
-          throw new Error(`Error al crear la receta: ${response.status} ${response.statusText} - ${errorMessage}`);
-        }
-
-        const responseData = await response.json();
-        console.log('Respuesta exitosa:', responseData);
-
-        Alert.alert('Éxito', 'Receta creada correctamente');
-        router.back();
-      } catch (decodeError) {
-        console.error('Error al decodificar el token:', decodeError);
-        throw new Error('Error al procesar el token de autenticación');
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No hay token de autenticación');
       }
-    } catch (error) {
-      console.error('Error completo al subir la receta:', {
-        message: error.message,
-        stack: error.stack,
-        recipeData: JSON.stringify(recipeData, null, 2)
+
+      const decodedToken = jwtDecode(token);
+      const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
+      
+      if (!userId) {
+        throw new Error('No se pudo obtener el ID del usuario del token');
+      }
+
+      // Crear FormData para enviar las imágenes
+      const formDataToSend = new FormData();
+
+      // Preparar los datos de la receta
+      const recipeData = {
+        userId,
+        title: formData.title,
+        description: formData.description,
+        prepTime: parseInt(formData.prepTime),
+        cookTime: parseInt(formData.cookTime),
+        servings: parseInt(formData.servings),
+        difficulty: formData.difficulty,
+        typeId: selectedType,
+        isPublic: formData.isPublic || false,
+        ingredients: formData.ingredients.map(ing => ({
+          name: ing.name,
+          amount: parseFloat(ing.amount),
+          unit: ing.unit,
+          isOptional: ing.isOptional || false
+        })),
+        steps: formData.steps.map((step, index) => ({
+          text: step.text,
+          photoIndex: step.photo ? index : null
+        }))
+      };
+
+      // Agregar los datos de la receta como string JSON
+      formDataToSend.append('recipeData', JSON.stringify(recipeData));
+
+      // Agregar la imagen principal de la receta si existe
+      if (formData.imageUrl) {
+        try {
+          const { blob, extension, mimeType } = await processImage(formData.imageUrl);
+          const fileName = generateUniqueFileName('recipe', extension);
+          
+          formDataToSend.append('recipeImage', {
+            uri: formData.imageUrl,
+            name: fileName,
+            type: mimeType
+          });
+
+          console.log('Imagen principal procesada:', {
+            fileName,
+            type: mimeType,
+            size: blob.size
+          });
+        } catch (error) {
+          console.error('Error al procesar la imagen principal:', error);
+          throw new Error('No se pudo procesar la imagen principal');
+        }
+      }
+
+      // Agregar las imágenes de los pasos
+      const stepImages = formData.steps
+        .filter(step => step.photo)
+        .map((step, index) => ({
+          uri: step.photo.uri,
+          name: step.photo.name,
+          type: step.photo.type,
+          photoIndex: index
+        }));
+
+      if (stepImages.length > 0) {
+        stepImages.forEach((image) => {
+          formDataToSend.append('stepImages', {
+            uri: image.uri,
+            name: image.name,
+            type: image.type
+          });
+        });
+
+        console.log('Imágenes de pasos preparadas:', {
+          count: stepImages.length,
+          images: stepImages.map(img => ({
+            name: img.name,
+            type: img.type,
+            photoIndex: img.photoIndex
+          }))
+        });
+      }
+
+      // Log detallado del FormData antes de enviar
+      console.log('FormData preparado:', {
+        hasRecipeData: !!formDataToSend.get('recipeData'),
+        hasMainImage: !!formDataToSend.get('recipeImage'),
+        stepImagesCount: stepImages.length,
+        recipeData: JSON.parse(formDataToSend.get('recipeData')),
+        stepsWithPhotos: formData.steps
+          .map((step, index) => ({
+            stepIndex: index,
+            hasPhoto: !!step.photo,
+            photoIndex: step.photo ? index : null
+          }))
+          .filter(step => step.hasPhoto)
       });
-      Alert.alert(
-        'Error',
-        'No se pudo subir la receta. Se guardará localmente y se intentará subir más tarde.',
-        [{ text: 'OK' }]
-      );
-      await savePendingRecipe(recipeData);
+
+      const response = await fetch(`${HOST_URL}/api/recipes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        },
+        body: formDataToSend
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error del servidor:', errorData);
+        throw new Error(errorData.message || 'Error al crear la receta');
+      }
+
+      const responseData = await response.json();
+      console.log('Respuesta del servidor:', responseData);
+
+      Alert.alert('Éxito', 'Receta creada correctamente');
       router.back();
+    } catch (error) {
+      console.error('Error completo al crear la receta:', error);
+      Alert.alert('Error', error.message || 'No se pudo crear la receta');
     }
   };
 
@@ -662,45 +629,6 @@ export default function CreateRecipe() {
         i === index ? { ...step, [field]: value } : step
       )
     }));
-  };
-
-  const pickStepPhoto = async (index) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Por favor permita acceder a la galería para subir fotos.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-      allowsMultipleSelection: false,
-      exif: false,
-    });
-
-    if (!result.canceled) {
-      const response = await fetch(result.assets[0].uri);
-      const blob = await response.blob();
-      
-      if (blob.size > 5 * 1024 * 1024) {
-        Alert.alert('Error', 'La imagen es demasiado grande. El tamaño máximo permitido es 5MB.');
-        return;
-      }
-
-      const fileExtension = result.assets[0].uri.split('.').pop().toLowerCase();
-      if (!['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-        Alert.alert('Error', 'Solo se permiten archivos de imagen (jpg, jpeg, png, gif).');
-        return;
-      }
-
-      updateStep(index, 'photo', {
-        extension: fileExtension,
-        url: result.assets[0].uri
-      });
-    }
   };
 
   const removeStepPhoto = (index) => {
@@ -951,7 +879,7 @@ export default function CreateRecipe() {
             <View style={styles.stepPhotoContainer}>
               {step.photo ? (
                 <View style={styles.stepPhotoPreview}>
-                  <Image source={{ uri: step.photo.url }} style={styles.stepPhoto} />
+                  <Image source={{ uri: step.photo.uri }} style={styles.stepPhoto} />
                   <TouchableOpacity
                     style={styles.removePhotoButton}
                     onPress={() => removeStepPhoto(index)}

@@ -1,14 +1,26 @@
-import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
 
-export default function RecipeDetail() {
+export default function RecipeDetails() {
   const { id } = useLocalSearchParams();
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     fetchRecipe();
@@ -17,40 +29,84 @@ export default function RecipeDetail() {
   const fetchRecipe = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${HOST_URL}/api/recipes/${id}`);
+      const token = await AsyncStorage.getItem('authToken');
       
+      if (!token) {
+        throw new Error('No hay token de autenticación');
+      }
+
+      const response = await fetch(`${HOST_URL}/api/recipes/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
       if (!response.ok) {
-        throw new Error('Error al cargar la receta');
+        throw new Error('No se pudo cargar la receta');
       }
 
       const data = await response.json();
-      if (data.success) {
-        setRecipe(data.recipe);
-      } else {
+      
+      if (!data.success) {
         throw new Error(data.message || 'Error al cargar la receta');
       }
+
+      setRecipe(data.recipe);
+
+      // Verificar si el usuario actual es el dueño de la receta
+      const decodedToken = JSON.parse(atob(token.split('.')[1]));
+      const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
+      setIsOwner(userId === data.recipe.userId);
+
     } catch (error) {
+      console.error('Error al cargar la receta:', error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderStep = (step, index) => (
-    <View key={step.idStep} style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={styles.stepNumber}>Paso {step.numberStep}</Text>
-      </View>
-      <Text style={styles.stepText}>{step.text}</Text>
-      {step.photoUrl && (
-        <Image
-          source={{ uri: `${HOST_URL}${step.photoUrl}` }}
-          style={styles.stepPhoto}
-          resizeMode="cover"
-        />
-      )}
-    </View>
-  );
+  const handleDelete = async () => {
+    Alert.alert(
+      'Eliminar Receta',
+      '¿Estás seguro de que deseas eliminar esta receta? Esta acción no se puede deshacer.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('authToken');
+              const response = await fetch(`${HOST_URL}/api/recipes/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              if (!response.ok) {
+                throw new Error('No se pudo eliminar la receta');
+              }
+
+              Alert.alert('Éxito', 'Receta eliminada correctamente');
+              router.back();
+            } catch (error) {
+              console.error('Error al eliminar la receta:', error);
+              Alert.alert('Error', 'No se pudo eliminar la receta');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEdit = () => {
+    router.push(`/recipes/edit/${id}`);
+  };
 
   if (loading) {
     return (
@@ -64,6 +120,12 @@ export default function RecipeDetail() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={fetchRecipe}
+        >
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -78,55 +140,87 @@ export default function RecipeDetail() {
 
   return (
     <ScrollView style={styles.container}>
-      <Image
-        source={{ uri: `${HOST_URL}${recipe.imageUrl}` }}
-        style={styles.recipeImage}
-        resizeMode="cover"
-      />
+      {/* Imagen principal */}
+      {recipe.imageUrl && (
+        <Image
+          source={{ uri: `${HOST_URL}${recipe.imageUrl}` }}
+          style={styles.mainImage}
+          resizeMode="cover"
+        />
+      )}
 
-      <View style={styles.section}>
-        <Text style={styles.recipeTitle}>{recipe.title}</Text>
-        <Text style={styles.recipeAuthor}>Por: {recipe.authorName}</Text>
-        <Text style={styles.recipeDescription}>{recipe.description}</Text>
-      </View>
+      {/* Botones de acción */}
+      {isOwner && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={handleEdit}
+          >
+            <Ionicons name="pencil" size={24} color={colors.white} />
+            <Text style={styles.actionButtonText}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={handleDelete}
+          >
+            <Ionicons name="trash" size={24} color={colors.white} />
+            <Text style={styles.actionButtonText}>Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
+      {/* Información básica */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Detalles</Text>
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Tiempo de preparación</Text>
-            <Text style={styles.detailValue}>{recipe.prepTime} min</Text>
+        <Text style={styles.title}>{recipe.title}</Text>
+        <Text style={styles.author}>Por: {recipe.authorName}</Text>
+        
+        <View style={styles.metaInfo}>
+          <View style={styles.metaItem}>
+            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+            <Text style={styles.metaText}>{recipe.prepTime + recipe.cookTime} min</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Tiempo de cocción</Text>
-            <Text style={styles.detailValue}>{recipe.cookTime} min</Text>
+          <View style={styles.metaItem}>
+            <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+            <Text style={styles.metaText}>{recipe.servings} porciones</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Porciones</Text>
-            <Text style={styles.detailValue}>{recipe.servings}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Dificultad</Text>
-            <Text style={styles.detailValue}>{recipe.difficulty}</Text>
+          <View style={styles.metaItem}>
+            <Ionicons name="speedometer-outline" size={20} color={colors.textSecondary} />
+            <Text style={styles.metaText}>{recipe.difficulty}</Text>
           </View>
         </View>
+
+        <Text style={styles.description}>{recipe.description}</Text>
       </View>
 
+      {/* Ingredientes */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ingredientes</Text>
         {recipe.ingredients.map((ingredient, index) => (
           <View key={index} style={styles.ingredientItem}>
             <Text style={styles.ingredientText}>
-              • {ingredient.amount} {ingredient.unit} de {ingredient.name}
+              • {ingredient.amount} {ingredient.unitAbbreviation} de {ingredient.ingredientName}
               {ingredient.isOptional && ' (opcional)'}
             </Text>
           </View>
         ))}
       </View>
 
+      {/* Pasos */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pasos</Text>
-        {recipe.steps.map((step, index) => renderStep(step, index))}
+        {recipe.steps.map((step, index) => (
+          <View key={index} style={styles.stepItem}>
+            <Text style={styles.stepNumber}>Paso {index + 1}</Text>
+            <Text style={styles.stepText}>{step.text}</Text>
+            {step.photo && (
+              <Image
+                source={{ uri: `${HOST_URL}${step.photo.url}` }}
+                style={styles.stepImage}
+                resizeMode="cover"
+              />
+            )}
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
@@ -141,39 +235,84 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
     padding: 20,
   },
   errorText: {
     color: colors.error,
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
   },
-  recipeImage: {
+  retryButton: {
+    backgroundColor: colors.primary,
+    padding: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+  },
+  mainImage: {
     width: '100%',
     height: 250,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 10,
+    gap: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 5,
+    gap: 5,
+  },
+  editButton: {
+    backgroundColor: colors.primary,
+  },
+  deleteButton: {
+    backgroundColor: colors.error,
+  },
+  actionButtonText: {
+    color: colors.white,
+    fontSize: 16,
   },
   section: {
     padding: 20,
   },
-  recipeTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 5,
-  },
-  recipeAuthor: {
-    fontSize: 16,
-    color: colors.textSecondary,
     marginBottom: 10,
   },
-  recipeDescription: {
+  author: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 15,
+  },
+  metaInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  metaText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  description: {
     fontSize: 16,
     color: colors.text,
     lineHeight: 24,
@@ -184,28 +323,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 15,
   },
-  detailsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-  },
-  detailItem: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.cardBackground,
-    padding: 15,
-    borderRadius: 10,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 5,
-  },
-  detailValue: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: 'bold',
-  },
   ingredientItem: {
     marginBottom: 10,
   },
@@ -214,33 +331,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 24,
   },
-  stepContainer: {
+  stepItem: {
     marginBottom: 20,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 10,
-    padding: 15,
-  },
-  stepHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
   },
   stepNumber: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
+    marginBottom: 10,
   },
   stepText: {
     fontSize: 16,
     color: colors.text,
-    marginBottom: 10,
     lineHeight: 24,
+    marginBottom: 10,
   },
-  stepPhoto: {
+  stepImage: {
     width: '100%',
     height: 200,
     borderRadius: 10,
-    marginTop: 10,
   },
 }); 
