@@ -195,8 +195,11 @@ export default function HomePage() {
           <Text style={styles.navText}>Buscar</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="bookmark" size={24} color={colors.textSecondary} />
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/recipes/favorites')}
+        >
+          <Ionicons name="heart-outline" size={24} color={colors.textSecondary} />
           <Text style={styles.navText}>Guardados</Text>
         </TouchableOpacity>
 
@@ -341,6 +344,16 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   navText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  mainActionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  mainActionText: {
     fontSize: 10,
     color: colors.textSecondary,
     marginTop: 2,

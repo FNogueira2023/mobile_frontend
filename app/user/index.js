@@ -159,16 +159,6 @@ export default function UserProfile() {
           <Text style={styles.mainActionText}>Mis recetas</Text>
         </TouchableOpacity>
 
-        {userData?.userType === 'student' && (
-          <TouchableOpacity 
-            style={styles.mainActionButton}
-            onPress={() => router.push('/courses/my-courses')}
-          >
-            <Ionicons name="school-outline" size={32} color={colors.primary} />
-            <Text style={styles.mainActionText}>Mis cursos</Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity 
           style={styles.mainActionButton}
           onPress={() => router.push('/recipes/favorites')}
@@ -177,13 +167,13 @@ export default function UserProfile() {
           <Text style={styles.mainActionText}>Mis favoritos</Text>
         </TouchableOpacity>
 
-        {userData?.userType === 'student' && (
+        {userData?.userType !== 'student' && (
           <TouchableOpacity 
             style={styles.mainActionButton}
-            onPress={() => router.push('/attendance/qr-scanner')}
+            onPress={() => router.push('/auth/upgrade-to-student')}
           >
-            <Ionicons name="qr-code-outline" size={32} color={colors.primary} />
-            <Text style={styles.mainActionText}>QR ingreso</Text>
+            <Ionicons name="school-outline" size={32} color={colors.primary} />
+            <Text style={styles.mainActionText}>Convertirse en alumno</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -197,16 +187,6 @@ export default function UserProfile() {
           <Ionicons name="create-outline" size={24} color={colors.white} />
           <Text style={styles.secondaryActionText}>Actualizar datos</Text>
         </TouchableOpacity>
-
-        {userData?.userType !== 'student' && (
-          <TouchableOpacity 
-            style={[styles.secondaryActionButton, styles.becomeStudentButton]}
-            onPress={handleBecomeStudent}
-          >
-            <Ionicons name="school-outline" size={24} color={colors.white} />
-            <Text style={styles.secondaryActionText}>Convertirse en alumno</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Botón de Cerrar Sesión */}
@@ -309,9 +289,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
-  },
-  becomeStudentButton: {
-    backgroundColor: colors.secondary,
   },
   secondaryActionText: {
     color: colors.white,

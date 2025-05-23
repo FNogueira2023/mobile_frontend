@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -21,9 +21,11 @@ export default function RecipeDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     fetchRecipe();
+    checkIfFavorite();
   }, [id]);
 
   const fetchRecipe = async () => {
@@ -63,6 +65,72 @@ export default function RecipeDetails() {
       setError(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkIfFavorite = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userDataString = await AsyncStorage.getItem('userData');
+      
+      if (!token || !userDataString) return;
+
+      const userData = JSON.parse(userDataString);
+      const response = await fetch(`${HOST_URL}/api/users/${userData.userId}/favorites`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const isFav = data.favorites.some(fav => fav.recipeId === parseInt(id));
+          setIsFavorite(isFav);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userDataString = await AsyncStorage.getItem('userData');
+      
+      if (!token || !userDataString) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const userData = JSON.parse(userDataString);
+      const method = isFavorite ? 'DELETE' : 'POST';
+      const url = isFavorite 
+        ? `${HOST_URL}/api/users/${userData.userId}/favorites/${id}`
+        : `${HOST_URL}/api/users/${userData.userId}/favorites`;
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        ...(method === 'POST' && { body: JSON.stringify({ recipeId: parseInt(id) }) })
+      });
+
+      if (!response.ok) {
+        throw new Error(isFavorite ? 'Error al quitar de favoritos' : 'Error al agregar a favoritos');
+      }
+
+      setIsFavorite(!isFavorite);
+      Alert.alert(
+        'Éxito',
+        isFavorite ? 'Receta quitada de favoritos' : 'Receta agregada a favoritos'
+      );
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', 'No se pudo actualizar el estado de favoritos');
     }
   };
 
@@ -139,90 +207,157 @@ export default function RecipeDetails() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Imagen principal */}
-      {recipe.imageUrl && (
-        <Image
-          source={{ uri: `${HOST_URL}${recipe.imageUrl}` }}
-          style={styles.mainImage}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Botones de acción */}
-      {isOwner && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={handleEdit}
-          >
-            <Ionicons name="pencil" size={24} color={colors.white} />
-            <Text style={styles.actionButtonText}>Editar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={handleDelete}
-          >
-            <Ionicons name="trash" size={24} color={colors.white} />
-            <Text style={styles.actionButtonText}>Eliminar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Información básica */}
-      <View style={styles.section}>
-        <Text style={styles.title}>{recipe.title}</Text>
-        <Text style={styles.author}>Por: {recipe.authorName}</Text>
-        
-        <View style={styles.metaInfo}>
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
-            <Text style={styles.metaText}>{recipe.prepTime + recipe.cookTime} min</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-            <Text style={styles.metaText}>{recipe.servings} porciones</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="speedometer-outline" size={20} color={colors.textSecondary} />
-            <Text style={styles.metaText}>{recipe.difficulty}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.description}>{recipe.description}</Text>
-      </View>
-
-      {/* Ingredientes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ingredientes</Text>
-        {recipe.ingredients.map((ingredient, index) => (
-          <View key={index} style={styles.ingredientItem}>
-            <Text style={styles.ingredientText}>
-              • {ingredient.amount} {ingredient.unitAbbreviation} de {ingredient.ingredientName}
-              {ingredient.isOptional && ' (opcional)'}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Pasos */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Pasos</Text>
-        {recipe.steps.map((step, index) => (
-          <View key={index} style={styles.stepItem}>
-            <Text style={styles.stepNumber}>Paso {index + 1}</Text>
-            <Text style={styles.stepText}>{step.text}</Text>
-            {step.photo && (
-              <Image
-                source={{ uri: `${HOST_URL}${step.photo.url}` }}
-                style={styles.stepImage}
-                resizeMode="cover"
+    <>
+      <Stack.Screen
+        options={{
+          title: recipe.title,
+          headerStyle: {
+            backgroundColor: colors.primary,
+          },
+          headerTintColor: colors.white,
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={toggleFavorite}
+              style={styles.favoriteButton}
+            >
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={24}
+                color={isFavorite ? colors.error : colors.white}
               />
-            )}
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          {/* Imagen principal */}
+          {recipe.imageUrl && (
+            <Image
+              source={{ uri: `${HOST_URL}${recipe.imageUrl}` }}
+              style={styles.mainImage}
+              resizeMode="cover"
+            />
+          )}
+
+          {/* Botones de acción */}
+          {isOwner && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.editButton]}
+                onPress={handleEdit}
+              >
+                <Ionicons name="pencil" size={24} color={colors.white} />
+                <Text style={styles.actionButtonText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={handleDelete}
+              >
+                <Ionicons name="trash" size={24} color={colors.white} />
+                <Text style={styles.actionButtonText}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Información básica */}
+          <View style={styles.section}>
+            <Text style={styles.title}>{recipe.title}</Text>
+            <Text style={styles.author}>Por: {recipe.authorName}</Text>
+            
+            <View style={styles.metaInfo}>
+              <View style={styles.metaItem}>
+                <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+                <Text style={styles.metaText}>{recipe.prepTime + recipe.cookTime} min</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+                <Text style={styles.metaText}>{recipe.servings} porciones</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Ionicons name="speedometer-outline" size={20} color={colors.textSecondary} />
+                <Text style={styles.metaText}>{recipe.difficulty}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.description}>{recipe.description}</Text>
           </View>
-        ))}
+
+          {/* Ingredientes */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ingredientes</Text>
+            {recipe.ingredients.map((ingredient, index) => (
+              <View key={index} style={styles.ingredientItem}>
+                <Text style={styles.ingredientText}>
+                  • {ingredient.amount} {ingredient.unitAbbreviation} de {ingredient.ingredientName}
+                  {ingredient.isOptional && ' (opcional)'}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Pasos */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pasos</Text>
+            {recipe.steps.map((step, index) => (
+              <View key={index} style={styles.stepItem}>
+                <Text style={styles.stepNumber}>Paso {index + 1}</Text>
+                <Text style={styles.stepText}>{step.text}</Text>
+                {step.photo && (
+                  <Image
+                    source={{ uri: `${HOST_URL}${step.photo.url}` }}
+                    style={styles.stepImage}
+                    resizeMode="cover"
+                  />
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => router.push('/')}
+          >
+            <Ionicons name="home" size={24} color={colors.textSecondary} />
+            <Text style={styles.navText}>Home</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => router.push('/recipes/search-recipes')}
+          >
+            <Ionicons name="search" size={24} color={colors.textSecondary} />
+            <Text style={styles.navText}>Buscar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => router.push('/recipes/favorites')}
+          >
+            <Ionicons name="heart-outline" size={24} color={colors.textSecondary} />
+            <Text style={styles.navText}>Guardados</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.navItem}>
+            <Ionicons name="school" size={24} color={colors.textSecondary} />
+            <Text style={styles.navText}>Cursos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => router.push('/user')}
+          >
+            <Ionicons name="person" size={24} color={colors.textSecondary} />
+            <Text style={styles.navText}>Usuario</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </ScrollView>
+    </>
   );
 }
 
@@ -350,5 +485,31 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: 10,
+  },
+  favoriteButton: {
+    marginRight: 16,
+    padding: 4,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  navText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 }); 
