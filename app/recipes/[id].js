@@ -16,17 +16,21 @@ import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
 
 export default function RecipeDetails() {
-  const { id } = useLocalSearchParams();
+  const { id: recipeId } = useLocalSearchParams();
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [averageRating, setAverageRating] = useState(0);
 
   useEffect(() => {
-    fetchRecipe();
-    checkIfFavorite();
-  }, [id]);
+    if (recipeId) {
+      fetchRecipe();
+      checkIfFavorite();
+      fetchAverageRating();
+    }
+  }, [recipeId]);
 
   const fetchRecipe = async () => {
     try {
@@ -37,17 +41,25 @@ export default function RecipeDetails() {
         throw new Error('No hay token de autenticación');
       }
 
-      const response = await fetch(`${HOST_URL}/api/recipes/${id}`, {
+      console.log('Fetching recipe with ID:', recipeId);
+      console.log('Using token:', token.substring(0, 20) + '...');
+
+      const response = await fetch(`${HOST_URL}/api/recipes/${recipeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('No se pudo cargar la receta');
+        const errorData = await response.json().catch(() => null);
+        console.error('Error response:', errorData);
+        throw new Error(errorData?.message || 'No se pudo cargar la receta');
       }
 
       const data = await response.json();
+      console.log('Recipe data received:', data);
       
       if (!data.success) {
         throw new Error(data.message || 'Error al cargar la receta');
@@ -56,12 +68,16 @@ export default function RecipeDetails() {
       setRecipe(data.recipe);
 
       // Verificar si el usuario actual es el dueño de la receta
-      const decodedToken = JSON.parse(atob(token.split('.')[1]));
-      const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
-      setIsOwner(userId === data.recipe.userId);
+      try {
+        const decodedToken = JSON.parse(atob(token.split('.')[1]));
+        const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
+        setIsOwner(userId === data.recipe.userId);
+      } catch (tokenError) {
+        console.error('Error decoding token:', tokenError);
+      }
 
     } catch (error) {
-      console.error('Error al cargar la receta:', error);
+      console.error('Error completo al cargar la receta:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -69,29 +85,83 @@ export default function RecipeDetails() {
   };
 
   const checkIfFavorite = async () => {
+    const token = await AsyncStorage.getItem('authToken');
+    const userDataString = await AsyncStorage.getItem('userData');
+    
+    if (!token || !userDataString) {
+      setIsFavorite(false);
+      return;
+    }
+
+    const userData = JSON.parse(userDataString);
+    const response = await fetch(`${HOST_URL}/api/users/${userData.userId}/favorites`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }).catch(() => null);
+
+    if (!response?.ok) {
+      setIsFavorite(false);
+      return;
+    }
+
+    const data = await response.json().catch(() => null);
+    if (!data?.success) {
+      setIsFavorite(false);
+      return;
+    }
+
+    const favorites = data.favorites || [];
+    const isFav = favorites.some(fav => fav.recipeId === parseInt(recipeId));
+    setIsFavorite(isFav);
+  };
+
+  const fetchAverageRating = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const userDataString = await AsyncStorage.getItem('userData');
-      
-      if (!token || !userDataString) return;
+      if (!token) {
+        console.log('No token available for fetching average rating');
+        return;
+      }
 
-      const userData = JSON.parse(userDataString);
-      const response = await fetch(`${HOST_URL}/api/users/${userData.userId}/favorites`, {
+      console.log('Fetching average rating for recipe:', recipeId);
+      const response = await fetch(`${HOST_URL}/api/recipes/${recipeId}/ratings/average`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
+      console.log('Average rating response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          const isFav = data.favorites.some(fav => fav.recipeId === parseInt(id));
-          setIsFavorite(isFav);
+        console.log('Average rating data:', data);
+        if (data.averageRating) {
+          console.log('Setting average rating to:', parseFloat(data.averageRating));
+          setAverageRating(parseFloat(data.averageRating));
         }
+      } else {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error fetching average rating:', errorData);
       }
     } catch (error) {
-      console.error('Error checking favorite status:', error);
+      console.error('Error in fetchAverageRating:', error);
     }
+  };
+
+  const renderStars = (value) => {
+    return (
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Ionicons
+            key={star}
+            name={star <= value ? "star" : "star-outline"}
+            size={16}
+            color={star <= value ? colors.primary : colors.textSecondary}
+          />
+        ))}
+      </View>
+    );
   };
 
   const toggleFavorite = async () => {
@@ -107,7 +177,7 @@ export default function RecipeDetails() {
       const userData = JSON.parse(userDataString);
       const method = isFavorite ? 'DELETE' : 'POST';
       const url = isFavorite 
-        ? `${HOST_URL}/api/users/${userData.userId}/favorites/${id}`
+        ? `${HOST_URL}/api/users/${userData.userId}/favorites/${recipeId}`
         : `${HOST_URL}/api/users/${userData.userId}/favorites`;
 
       const response = await fetch(url, {
@@ -116,21 +186,21 @@ export default function RecipeDetails() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        ...(method === 'POST' && { body: JSON.stringify({ recipeId: parseInt(id) }) })
+        ...(method === 'POST' && { body: JSON.stringify({ recipeId: parseInt(recipeId) }) })
       });
 
       if (!response.ok) {
-        throw new Error(isFavorite ? 'Error al quitar de favoritos' : 'Error al agregar a favoritos');
+        return;
       }
 
+      const responseData = await response.json();
       setIsFavorite(!isFavorite);
       Alert.alert(
         'Éxito',
         isFavorite ? 'Receta quitada de favoritos' : 'Receta agregada a favoritos'
       );
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      Alert.alert('Error', 'No se pudo actualizar el estado de favoritos');
+    } catch {
+      // No hacer nada en caso de error
     }
   };
 
@@ -149,7 +219,7 @@ export default function RecipeDetails() {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('authToken');
-              const response = await fetch(`${HOST_URL}/api/recipes/${id}`, {
+              const response = await fetch(`${HOST_URL}/api/recipes/${recipeId}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${token}`
@@ -173,7 +243,45 @@ export default function RecipeDetails() {
   };
 
   const handleEdit = () => {
-    router.push(`/recipes/edit/${id}`);
+    router.push(`/recipes/edit/${recipeId}`);
+  };
+
+  const handleRatingPress = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userDataString = await AsyncStorage.getItem('userData');
+      
+      if (!token || !userDataString) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const userData = JSON.parse(userDataString);
+      
+      // Verificar si el usuario ya calificó usando el endpoint específico
+      const response = await fetch(`${HOST_URL}/api/users/${userData.userId}/recipes/${recipeId}/rated`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasRated) {
+          Alert.alert(
+            'Ya has calificado esta receta',
+            'No puedes calificar la misma receta más de una vez.'
+          );
+          return;
+        }
+      }
+
+      // Si no ha calificado, navegar a la vista de rating
+      router.push(`/recipes/rating?id=${recipeId}`);
+    } catch (error) {
+      console.error('Error checking user rating:', error);
+      Alert.alert('Error', 'No se pudo verificar si ya has calificado esta receta');
+    }
   };
 
   if (loading) {
@@ -210,7 +318,7 @@ export default function RecipeDetails() {
     <>
       <Stack.Screen
         options={{
-          title: recipe.title,
+          title: recipe?.title || 'Detalles de la receta',
           headerStyle: {
             backgroundColor: colors.primary,
           },
@@ -265,25 +373,33 @@ export default function RecipeDetails() {
 
           {/* Información básica */}
           <View style={styles.section}>
-            <Text style={styles.title}>{recipe.title}</Text>
-            <Text style={styles.author}>Por: {recipe.authorName}</Text>
+            <Text style={styles.title}>{recipe?.title}</Text>
+            <View style={styles.authorContainer}>
+              <Text style={styles.author}>Por: {recipe?.authorName}</Text>
+              <View style={styles.ratingContainer}>
+                {renderStars(Math.round(averageRating))}
+                <Text style={styles.ratingText}>
+                  {averageRating > 0 ? averageRating.toFixed(1) : 'Sin calificaciones'}
+                </Text>
+              </View>
+            </View>
             
             <View style={styles.metaInfo}>
               <View style={styles.metaItem}>
                 <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
-                <Text style={styles.metaText}>{recipe.prepTime + recipe.cookTime} min</Text>
+                <Text style={styles.metaText}>{recipe?.prepTime + recipe?.cookTime} min</Text>
               </View>
               <View style={styles.metaItem}>
                 <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-                <Text style={styles.metaText}>{recipe.servings} porciones</Text>
+                <Text style={styles.metaText}>{recipe?.servings} porciones</Text>
               </View>
               <View style={styles.metaItem}>
                 <Ionicons name="speedometer-outline" size={20} color={colors.textSecondary} />
-                <Text style={styles.metaText}>{recipe.difficulty}</Text>
+                <Text style={styles.metaText}>{recipe?.difficulty}</Text>
               </View>
             </View>
 
-            <Text style={styles.description}>{recipe.description}</Text>
+            <Text style={styles.description}>{recipe?.description}</Text>
           </View>
 
           {/* Ingredientes */}
@@ -317,6 +433,16 @@ export default function RecipeDetails() {
             ))}
           </View>
         </ScrollView>
+
+        <View style={styles.commentButtonContainer}>
+          <TouchableOpacity
+            style={styles.commentButton}
+            onPress={handleRatingPress}
+          >
+            <Ionicons name="chatbubble-outline" size={24} color={colors.white} />
+            <Text style={styles.commentButtonText}>Dejar comentario</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.bottomNav}>
           <TouchableOpacity 
@@ -428,10 +554,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 10,
   },
+  authorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
   author: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginBottom: 15,
   },
   metaInfo: {
     flexDirection: 'row',
@@ -511,5 +642,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  commentButtonContainer: {
+    padding: 16,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+    alignItems: 'center',
+  },
+  commentButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 8,
+    gap: 8,
+    width: '70%',
+  },
+  commentButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    gap: 2,
   },
 }); 
