@@ -3,14 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { HOST_URL } from '../config/config';
 import { colors } from '../theme/colors';
@@ -37,17 +37,15 @@ export default function RecipeDetails() {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       
-      if (!token) {
-        throw new Error('No hay token de autenticación');
+      console.log('Fetching recipe with ID:', recipeId);
+
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('Fetching recipe with ID:', recipeId);
-      console.log('Using token:', token.substring(0, 20) + '...');
-
       const response = await fetch(`${HOST_URL}/api/recipes/${recipeId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers
       });
 
       console.log('Response status:', response.status);
@@ -67,13 +65,15 @@ export default function RecipeDetails() {
 
       setRecipe(data.recipe);
 
-      // Verificar si el usuario actual es el dueño de la receta
-      try {
-        const decodedToken = JSON.parse(atob(token.split('.')[1]));
-        const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
-        setIsOwner(userId === data.recipe.userId);
-      } catch (tokenError) {
-        console.error('Error decoding token:', tokenError);
+      // Verificar si el usuario actual es el dueño de la receta solo si hay token
+      if (token) {
+        try {
+          const decodedToken = JSON.parse(atob(token.split('.')[1]));
+          const userId = decodedToken.userId || decodedToken.id || decodedToken.sub;
+          setIsOwner(userId === data.recipe.userId);
+        } catch (tokenError) {
+          console.error('Error decoding token:', tokenError);
+        }
       }
 
     } catch (error) {

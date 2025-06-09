@@ -235,7 +235,15 @@ export default function SearchRecipes() {
       params.append('page', currentPage);
       params.append('limit', 10); // Número de recetas por página
 
-      const response = await fetch(`${HOST_URL}/api/recipes/search?${params.toString()}`);
+      const token = await AsyncStorage.getItem('authToken');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${HOST_URL}/api/recipes/search?${params.toString()}`, {
+        headers
+      });
 
       if (!response.ok) {
         throw new Error('Error al buscar recetas');

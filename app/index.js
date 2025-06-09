@@ -53,23 +53,10 @@ export default function HomePage() {
         throw new Error(data.message || 'Error al cargar las recetas');
       }
 
-      if (!data.recipes || !Array.isArray(data.recipes)) {
-        console.error('Formato de datos inválido:', data);
-        throw new Error('Formato de respuesta inválido');
-      }
-
-      // Tomar solo las últimas 3 recetas del array ordenado
-      const latestRecipes = data.recipes.slice(0, 3);
-      console.log('Recetas procesadas:', JSON.stringify(latestRecipes, null, 2));
-      
-      setRecipes(latestRecipes);
-      console.log('Estado actualizado con', latestRecipes.length, 'recetas');
+      setRecipes(data.recipes);
+      setError(null);
     } catch (error) {
-      console.error('Error detallado al cargar las recetas:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
+      console.error('Error al cargar las recetas:', error);
       setError(error.message);
     } finally {
       setLoading(false);
